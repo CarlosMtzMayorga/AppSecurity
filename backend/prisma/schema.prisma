@@ -1,0 +1,511 @@
+// Prisma Schema for AppSecurity - Residential Management System
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  RESIDENT
+  SECURITY
+  COMMITTEE
+}
+
+enum ResidentStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  SUSPENDED
+}
+
+enum AccessType {
+  RESIDENT
+  VISITOR
+  SERVICE
+  DELIVERY
+  EMERGENCY
+}
+
+enum AccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  OVERDUE
+}
+
+enum PaymentType {
+  MAINTENANCE
+  EXTRAORDINARY
+  AMENITY
+  PENALTY
+  OTHER
+}
+
+enum NoticeType {
+  GENERAL
+  URGENT
+  MAINTENANCE
+  EVENT
+  SECURITY
+  FINANCIAL
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  REJECTED
+}
+
+enum ServiceRequestStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  REJECTED
+}
+
+enum ServiceRequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  phone         String?
+  avatarUrl     String?
+  role          UserRole     @default(RESIDENT)
+  isActive      Boolean      @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  resident      Resident?
+  administered  ResidentialComplex[] @relation("ComplexAdmin")
+  accesses      AccessLog[]  @relation("AccessResident")
+  visitorAccess AccessLog[]  @relation("AccessVisitor")
+  payments      Payment[]    @relation("PaymentUser")
+  notices       Notice[]     @relation("NoticeAuthor")
+  bookings      Booking[]    @relation("BookingUser")
+  serviceRequests ServiceRequest[] @relation("ServiceRequestUser")
+  serviceRequestsAssigned ServiceRequest[] @relation("ServiceRequestAssignee")
+  tokens        AuthToken[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model AuthToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model ResidentialComplex {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  city        String
+  state       String
+  postalCode  String
+  country     String   @default("México")
+  phone       String?
+  email       String?
+  logoUrl     String?
+  timezone    String   @default("America/Mexico_City")
+  currency    String   @default("MXN")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  adminId     String
+  admin       User     @relation("ComplexAdmin", fields: [adminId], references: [id])
+
+  residents   Resident[]
+  units       Unit[]
+  amenities   Amenity[]
+  notices     Notice[]
+  payments    Payment[]
+  bookings    Booking[]
+  serviceRequests ServiceRequest[]
+  accessLogs  AccessLog[]
+  accountingEntries AccountingEntry[]
+  accessConfigs AccessConfig[]
+
+  @@index([adminId])
+}
+
+model Unit {
+  id                String   @id @default(cuid())
+  complexId         String
+  complex           ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  number            String
+  block             String?
+  floor             Int?
+  type              String   @default("HOUSE")
+  area              Float?
+  bedrooms          Int?
+  bathrooms         Float?
+  hasParking        Boolean  @default(false)
+  parkingSpots      Int      @default(0)
+  monthlyFee        Float    @default(0)
+  extraordinaryFee  Float    @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  residents         Resident[]
+  accesses          AccessLog[]
+  bookings          Booking[]
+
+  @@unique([complexId, number])
+  @@index([complexId])
+}
+
+model Resident {
+  id            String         @id @default(cuid())
+  userId        String         @unique
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complexId     String
+  complex       ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  unitId        String
+  unit          Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  status        ResidentStatus @default(PENDING)
+  rut           String?        // RFC/CURP for Mexican residents
+  emergencyContactName String?
+  emergencyContactPhone String?
+  emergencyContactRelation String?
+  vehiclePlates String[]
+  accessCards   String[]       // RFID/NFC card IDs
+  faceIdEnabled Boolean        @default(false)
+  qrCode        String?        @unique
+  joinedAt      DateTime       @default(now())
+  approvedAt    DateTime?
+  approvedBy    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  accesses      AccessLog[]
+  visitors      Visitor[]
+  payments      Payment[]
+  bookings      Booking[]
+  serviceRequests ServiceRequest[]
+
+  @@index([complexId])
+  @@index([unitId])
+  @@index([status])
+}
+
+model Visitor {
+  id              String   @id @default(cuid())
+  residentId      String
+  resident        Resident @relation(fields: [residentId], references: [id], onDelete: Cascade)
+  firstName       String
+  lastName        String
+  phone           String?
+  email           String?
+  documentType    String?  // INE, PASSPORT, LICENSE
+  documentNumber  String?
+  photoUrl        String?
+  vehiclePlate    String?
+  isRecurring     Boolean  @default(false)
+  recurringDays   Int[]    // 0=Sun, 6=Sat
+  recurringStart  DateTime?
+  recurringEnd    DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  accesses        AccessLog[]
+
+  @@index([residentId])
+}
+
+model AccessLog {
+  id              String      @id @default(cuid())
+  complexId       String
+  complex         ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  unitId          String?
+  unit            Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  residentId      String?
+  resident        Resident?   @relation("AccessResident", fields: [residentId], references: [id], onDelete: SetNull)
+  visitorId       String?
+  visitor         Visitor?    @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  securityUserId  String?
+  securityUser    User?       @relation(fields: [securityUserId], references: [id], onDelete: SetNull)
+  type            AccessType
+  status          AccessStatus @default(PENDING)
+  entryTime       DateTime?
+  exitTime        DateTime?
+  scheduledEntry  DateTime?
+  scheduledExit   DateTime?
+  entryMethod     String?     // APP, CARD, QR, FACE, TOKEN, MANUAL
+  exitMethod      String?
+  plateRecognized String?
+  faceRecognized  Boolean     @default(false)
+  qrCodeUsed      String?
+  tokenUsed       String?
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([complexId, entryTime])
+  @@index([residentId])
+  @@index([visitorId])
+  @@index([status])
+  @@index([unitId])
+}
+
+model AccessConfig {
+  id                  String   @id @default(cuid())
+  complexId           String   @unique
+  complex             ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  gateIp              String?
+  gatePort            Int?
+  gateUsername        String?
+  gatePassword        String?
+  cameraUrl           String?
+  cameraUsername      String?
+  cameraPassword      String?
+  autoOpenEnabled     Boolean  @default(false)
+  autoOpenHoursStart  String?  // HH:MM
+  autoOpenHoursEnd    String?  // HH:MM
+  maxVisitorHours     Int      @default(4)
+  requirePhoto        Boolean  @default(true)
+  requireDocument     Boolean  @default(false)
+  allowRecurring      Boolean  @default(true)
+  faceRecognition     Boolean  @default(false)
+  plateRecognition    Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  complexId       String
+  complex         ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  residentId      String
+  resident        Resident      @relation(fields: [residentId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User          @relation("PaymentUser", fields: [userId], references: [id], onDelete: Cascade)
+  unitId          String
+  type            PaymentType
+  status          PaymentStatus @default(PENDING)
+  amount          Float
+  currency        String        @default("MXN")
+  description     String
+  reference       String?       @unique
+  stripePaymentIntentId String?
+  stripeCustomerId String?
+  paidAt          DateTime?
+  dueDate         DateTime
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  receiptUrl      String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([complexId])
+  @@index([residentId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([reference])
+}
+
+model Notice {
+  id          String      @id @default(cuid())
+  complexId   String
+  complex     ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User        @relation("NoticeAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  title       String
+  content     String
+  type        NoticeType  @default(GENERAL)
+  priority    Int         @default(0)
+  isPinned    Boolean     @default(false)
+  publishAt   DateTime    @default(now())
+  expiresAt   DateTime?
+  attachmentUrls String[]
+  targetRoles UserRole[]
+  targetUnits String[]    // empty = all units
+  readBy      String[]    // user IDs who read
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([complexId])
+  @@index([publishAt])
+  @@index([type])
+}
+
+model Amenity {
+  id              String   @id @default(cuid())
+  complexId       String
+  complex         ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  capacity        Int
+  location        String?
+  pricePerHour    Float    @default(0)
+  currency        String   @default("MXN")
+  requiresApproval Boolean @default(true)
+  maxHoursPerBooking Int   @default(4)
+  minHoursNotice   Int     @default(1) // hours before booking
+  maxDaysAdvance   Int     @default(30)
+  isActive        Boolean  @default(true)
+  images          String[]
+  rules           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bookings        Booking[]
+  schedules       AmenitySchedule[]
+
+  @@index([complexId])
+}
+
+model AmenitySchedule {
+  id          String   @id @default(cuid())
+  amenityId   String
+  amenity     Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int      // 0=Sun, 6=Sat
+  openTime    String   // HH:MM
+  closeTime   String   // HH:MM
+  isClosed    Boolean  @default(false)
+
+  @@unique([amenityId, dayOfWeek])
+}
+
+model Booking {
+  id              String         @id @default(cuid())
+  complexId       String
+  complex         ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  amenityId       String
+  amenity         Amenity        @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  unitId          String
+  unit            Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User           @relation("BookingUser", fields: [userId], references: [id], onDelete: Cascade)
+  residentId      String
+  startTime       DateTime
+  endTime         DateTime
+  status          BookingStatus  @default(PENDING)
+  totalPrice      Float          @default(0)
+  guestsCount     Int            @default(1)
+  notes           String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([complexId])
+  @@index([amenityId, startTime])
+  @@index([unitId])
+  @@index([status])
+  @@index([userId])
+}
+
+model ServiceRequest {
+  id              String                 @id @default(cuid())
+  complexId       String
+  complex         ResidentialComplex     @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  unitId          String
+  userId          String
+  user            User                   @relation("ServiceRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  assigneeId      String?
+  assignee        User?                  @relation("ServiceRequestAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  title           String
+  description     String
+  category        String
+  priority        ServiceRequestPriority @default(MEDIUM)
+  status          ServiceRequestStatus   @default(OPEN)
+  images          String[]
+  estimatedCost   Float?
+  actualCost      Float?
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  resolutionNotes String?
+  rating          Int?                   // 1-5
+  feedback        String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([complexId])
+  @@index([unitId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([priority])
+}
+
+model AccountingEntry {
+  id          String   @id @default(cuid())
+  complexId   String
+  complex     ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  type        String   // INCOME, EXPENSE
+  category    String
+  subcategory String?
+  amount      Float
+  currency    String   @default("MXN")
+  description String
+  reference   String?  // payment ID, invoice ID, etc.
+  date        DateTime
+  attachments String[]
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([complexId])
+  @@index([date])
+  @@index([type, category])
+}
+
+model ComplexSettings {
+  id                    String   @id @default(cuid())
+  complexId             String   @unique
+  complex               ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  maintenanceFee        Float    @default(0)
+  extraordinaryFee      Float    @default(0)
+  lateFeePercent        Float    @default(5)
+  lateFeeGraceDays      Int      @default(5)
+  allowPartialPayment   Boolean  @default(false)
+  requirePaymentApproval Boolean @default(false)
+  notifyPaymentDueDays  Int[]    @default([7, 3, 1])
+  notifyNewVisitor      Boolean  @default(true)
+  notifyAccessEntry     Boolean  @default(false)
+  notifyServiceUpdates  Boolean  @default(true)
+  defaultCurrency       String   @default("MXN")
+  stripePublishableKey  String?
+  stripeSecretKey       String?
+  stripeWebhookSecret   String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}

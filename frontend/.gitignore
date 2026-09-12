@@ -1,0 +1,35 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Generated
+*.g.dart
+*.freezed.dart
+*.gr.dart
+
+# Build
+*.apk
+*.aab
+*.ipa
+*.dmg
+*.app
