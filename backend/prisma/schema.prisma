@@ -155,8 +155,8 @@ model ResidentialComplex {
   serviceRequests ServiceRequest[]
   accessLogs  AccessLog[]
   accountingEntries AccountingEntry[]
-  accessConfigs AccessConfig[]
-  complexSettings ComplexSettings?
+  accessConfig AccessConfig[]
+  settings ComplexSettings?
 
   @@index([adminId])
 }
@@ -183,6 +183,8 @@ model Unit {
   residents         Resident[]
   accesses          AccessLog[]
   bookings          Booking[]
+  payments          Payment[]
+  serviceRequests   ServiceRequest[]
 
   @@unique([complexId, number])
   @@index([complexId])
@@ -315,6 +317,7 @@ model Payment {
   userId          String
   user            User          @relation("PaymentUser", fields: [userId], references: [id], onDelete: Cascade)
   unitId          String
+  unit            Unit          @relation(fields: [unitId], references: [id], onDelete: Restrict)
   type            PaymentType
   status          PaymentStatus @default(PENDING)
   amount          Float
@@ -438,6 +441,7 @@ model ServiceRequest {
   complexId       String
   complex         ResidentialComplex     @relation(fields: [complexId], references: [id], onDelete: Cascade)
   unitId          String
+  unit            Unit                   @relation(fields: [unitId], references: [id], onDelete: Restrict)
   userId          String
   user            User                   @relation("ServiceRequestUser", fields: [userId], references: [id], onDelete: Cascade)
   residentId      String?

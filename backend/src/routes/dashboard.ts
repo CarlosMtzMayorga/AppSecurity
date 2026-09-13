@@ -35,7 +35,7 @@ router.get('/overview', asyncHandler(async (req: AuthRequest, res) => {
     prisma.resident.count({ where: { complexId } }),
     prisma.resident.count({ where: { complexId, status: 'ACTIVE' } }),
     prisma.unit.count({ where: { complexId, isActive: true } }),
-    prisma.unit.count({ where: { complexId, isActive: true, resident: { status: 'ACTIVE' } } }),
+    prisma.unit.count({ where: { complexId, isActive: true, residents: { some: { status: 'ACTIVE' } } } }),
     prisma.payment.count({ where: { complexId, ...(Object.keys(dateWhere).length ? { dueDate: dateWhere } : {}) } }),
     prisma.payment.count({ where: { complexId, status: 'PENDING', ...(Object.keys(dateWhere).length ? { dueDate: dateWhere } : {}) } }),
     prisma.payment.count({ where: { complexId, status: 'OVERDUE', ...(Object.keys(dateWhere).length ? { dueDate: dateWhere } : {}) } }),

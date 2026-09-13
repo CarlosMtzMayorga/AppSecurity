@@ -17,7 +17,7 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
     prisma.unit.findMany({
       where,
       include: {
-        resident: { select: { id: true, user: { select: { firstName: true, lastName: true } }, status: true } },
+        residents: { take: 1, select: { id: true, user: { select: { firstName: true, lastName: true } }, status: true } },
       },
       orderBy: { [sortBy || 'number']: sortOrder },
       skip: (page - 1) * limit,
@@ -26,12 +26,15 @@ router.get('/', asyncHandler(async (req: AuthRequest, res) => {
     prisma.unit.count({ where }),
   ]);
 
-  const unitsWithStatus = units.map(u => ({
-    ...u,
-    hasResident: !!u.resident,
-    residentName: u.resident?.user ? `${u.resident.user.firstName} ${u.resident.user.lastName}` : null,
-    residentStatus: u.resident?.status || null,
-  }));
+  const unitsWithStatus = units.map(u => {
+    const resident = u.residents[0] ?? null;
+    return {
+      ...u,
+      hasResident: !!resident,
+      residentName: resident?.user ? `${resident.user.firstName} ${resident.user.lastName}` : null,
+      residentStatus: resident?.status || null,
+    };
+  });
 
   res.json({ data: unitsWithStatus, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 }));
@@ -48,7 +51,7 @@ router.get('/blocks', asyncHandler(async (req: AuthRequest, res) => {
 router.get('/:id', asyncHandler(async (req: AuthRequest, res) => {
   const unit = await prisma.unit.findFirst({
     where: { id: req.params.id, complexId: req.user!.complexId },
-    include: { resident: { include: { user: { select: { firstName: true, lastName: true, email: true, phone: true } } } } },
+    include: { residents: { take: 1, include: { user: { select: { firstName: true, lastName: true, email: true, phone: true } } } } },
   });
   if (!unit) throw new AppError(404, 'Unidad no encontrada');
   res.json(unit);
@@ -104,7 +107,7 @@ router.delete('/:id', asyncHandler(async (req: AuthRequest, res) => {
   });
   if (!unit) throw new AppError(404, 'Unidad no encontrada');
 
-  if (unit.resident) {
+  if (unit.residents.length) {
     throw new AppError(400, 'No se puede eliminar una unidad con residente asignado');
   }
 

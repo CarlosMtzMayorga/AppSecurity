@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
-import { AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import {
   registerSchema,
   loginSchema,
@@ -209,7 +209,7 @@ router.post('/logout', asyncHandler(async (req: AuthRequest, res) => {
   res.json({ message: 'Sesión cerrada' });
 }));
 
-router.post('/change-password', asyncHandler(async (req: AuthRequest, res) => {
+router.post('/change-password', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const data = changePasswordSchema.parse(req.body);
   
   const user = await prisma.user.findUnique({
@@ -237,7 +237,7 @@ router.post('/change-password', asyncHandler(async (req: AuthRequest, res) => {
   res.json({ message: 'Contraseña actualizada. Inicia sesión nuevamente.' });
 }));
 
-router.get('/me', asyncHandler(async (req: AuthRequest, res) => {
+router.get('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
     select: {
