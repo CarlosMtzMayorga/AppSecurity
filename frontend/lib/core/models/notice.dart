@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'user.dart';
 
 enum NoticeType { general, urgent, maintenance, event, security, financial }
 
@@ -38,6 +39,24 @@ class Notice extends Equatable {
   bool get isExpired => expiresAt != null && expiresAt!.isBefore(DateTime.now());
   bool get isPublished => publishAt.isBefore(DateTime.now());
   bool get isVisible => isPublished && !isExpired;
+  bool get isRead => readBy.isNotEmpty;
+
+  Notice copyWith({List<String>? readBy, bool? isPinned}) => Notice(
+    id: id,
+    title: title,
+    content: content,
+    type: type,
+    priority: priority,
+    isPinned: isPinned ?? this.isPinned,
+    publishAt: publishAt,
+    expiresAt: expiresAt,
+    attachmentUrls: attachmentUrls,
+    targetRoles: targetRoles,
+    targetUnits: targetUnits,
+    readBy: readBy ?? this.readBy,
+    author: author,
+    createdAt: createdAt,
+  );
 
   factory Notice.fromJson(Map<String, dynamic> json) => Notice(
     id: json['id'],

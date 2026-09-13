@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'user.dart';
 
 enum BookingStatus { pending, confirmed, cancelled, completed, rejected }
 

@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import 'user.dart';
+import 'access.dart';
 
 enum PaymentType { maintenance, extraordinary, amenity, penalty, other }
 enum PaymentStatus { pending, completed, failed, refunded, overdue }

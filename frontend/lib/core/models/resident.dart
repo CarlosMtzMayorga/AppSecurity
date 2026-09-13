@@ -1,4 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'user.dart';
+import 'access.dart';
+import 'payment.dart';
 
 enum ResidentStatus { active, inactive, pending, suspended }
 

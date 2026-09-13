@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverprovider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/notice.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/models/notice.dart';
+import 'notices_screen.dart';
 
 class NoticeDetailScreen extends ConsumerStatefulWidget {
   final String noticeId;

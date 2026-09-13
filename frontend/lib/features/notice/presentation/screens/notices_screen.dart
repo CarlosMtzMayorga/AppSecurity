@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/notice.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/providers/app_providers.dart';
+import '../../../../core/models/notice.dart';
+import '../../../../core/models/user.dart';
+import '../../../../shared/widgets/custom_text_field.dart';
 
 class NoticesScreen extends ConsumerStatefulWidget {
   const NoticesScreen({super.key});
@@ -55,6 +58,7 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen> {
   }
 
   Widget _buildUnreadBadge() {
+    final theme = Theme.of(context);
     return Consumer(
       builder: (context, ref, _) {
         final unreadAsync = ref.watch(unreadNoticesProvider);
@@ -278,7 +282,7 @@ class NoticesNotifier extends StateNotifier<NoticesState> {
   Future<void> markAsRead(String id) async {
     try {
       await _api.markAsRead(id);
-      state = state.copyWith(notices: state.notices.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList());
+      state = state.copyWith(notices: state.notices.map((n) => n.id == id ? n.copyWith(readBy: n.readBy.isEmpty ? ['me'] : n.readBy) : n).toList());
     } catch (e) {}
   }
 }

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/providers/app_providers.dart';
-import '../../../core/models/dashboard.dart';
-import '../../../shared/widgets/custom_button.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/providers/app_providers.dart';
+import '../../../../core/models/access.dart';
+import '../../../../core/models/dashboard.dart';
+import '../../../../core/models/user.dart';
+import '../../../../shared/widgets/custom_button.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -294,10 +297,8 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
   Future<void> loadOverview() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final [overview, activity] = await Future.wait([
-        _api.getOverview(),
-        _api.getRecentActivity(),
-      ]);
+      final overview = await _api.getOverview();
+      final activity = await _api.getRecentActivity();
       state = state.copyWith(isLoading: false, overview: overview, recentActivity: activity);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

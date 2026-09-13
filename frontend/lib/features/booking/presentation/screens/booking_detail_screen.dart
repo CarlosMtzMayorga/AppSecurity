@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/booking.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/models/booking.dart';
 
 class BookingDetailScreen extends ConsumerStatefulWidget {
   final String bookingId;

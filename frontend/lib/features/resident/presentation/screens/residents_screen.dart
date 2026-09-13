@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/resident.dart';
-import '../../../shared/widgets/custom_text_field.dart';
-import '../../../shared/widgets/custom_button.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/models/resident.dart';
+import '../../../../shared/widgets/custom_text_field.dart';
+import '../../../../shared/widgets/custom_button.dart';
 
 class ResidentsScreen extends ConsumerStatefulWidget {
   const ResidentsScreen({super.key});

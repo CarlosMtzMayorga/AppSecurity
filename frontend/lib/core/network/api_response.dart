@@ -26,9 +26,9 @@ class PaginatedResponse<T> {
     required this.totalPages,
   });
 
-  factory PaginatedResponse.fromJson(Map<String, dynamic> json, T Function(dynamic) fromJson) {
+  factory PaginatedResponse.fromJson(Map<String, dynamic> json, T Function(Map<String, dynamic>) fromJson) {
     return PaginatedResponse(
-      data: (json['data'] as List).map(fromJson).toList(),
+      data: (json['data'] as List).map((e) => fromJson(e as Map<String, dynamic>)).toList(),
       page: json['pagination']['page'] ?? 1,
       limit: json['pagination']['limit'] ?? 20,
       total: json['pagination']['total'] ?? 0,

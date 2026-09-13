@@ -77,6 +77,8 @@ class UnitInfo extends Equatable {
 
   const UnitInfo({required this.id, required this.number, this.block, this.floor});
 
+  String get displayNumber => block != null ? '$block-$number' : number;
+
   factory UnitInfo.fromJson(Map<String, dynamic> json) => UnitInfo(
     id: json['id'],
     number: json['number'],

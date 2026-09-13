@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../core/providers/app_providers.dart';
-import '../../../core/models/user.dart';
+import '../../../../core/providers/app_providers.dart';
+import '../../../../core/models/user.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -76,6 +76,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildAvatar(User user) {
+    final theme = Theme.of(context);
     return Stack(
       children: [
         CircleAvatar(

@@ -1,11 +1,15 @@
 import 'package:dio/dio.dart';
+import 'package:equatable/equatable.dart';
 import '../network/api_client.dart';
+import '../network/api_response.dart';
+import 'api_providers.dart';
 import '../models/accounting.dart';
 import '../models/dashboard.dart';
 import '../models/unit.dart';
 import '../models/amenity.dart';
 
 class AccountingApi extends BaseApi {
+  AccountingApi(ApiClient api) : super(api);
   Future<PaginatedResponse<AccountingEntry>> getEntries({
     int page = 1,
     int limit = 20,
@@ -34,7 +38,7 @@ class AccountingApi extends BaseApi {
 
   Future<List<MonthlyFinance>> getMonthly(int year) async {
     final response = await dio.get('/accounting/monthly', queryParameters: {'year': year});
-    return (response.data as List).map(MonthlyFinance.fromJson).toList();
+    return (response.data as List).map((e) => MonthlyFinance.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<AccountingEntry> getEntry(String id) async {
@@ -58,6 +62,7 @@ class AccountingApi extends BaseApi {
 }
 
 class DashboardApi extends BaseApi {
+  DashboardApi(ApiClient api) : super(api);
   Future<DashboardOverview> getOverview({DateTime? startDate, DateTime? endDate}) async {
     final params = <String, dynamic>{};
     if (startDate != null) params['startDate'] = startDate.toIso8601String();
@@ -73,16 +78,17 @@ class DashboardApi extends BaseApi {
 
   Future<List<TrendPoint>> getPaymentTrends({int months = 6}) async {
     final response = await dio.get('/dashboard/payment-trends', queryParameters: {'months': months});
-    return (response.data as List).map(TrendPoint.fromJson).toList();
+    return (response.data as List).map((e) => TrendPoint.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<TrendPoint>> getAccessTrends({int days = 30}) async {
     final response = await dio.get('/dashboard/access-trends', queryParameters: {'days': days});
-    return (response.data as List).map(TrendPoint.fromJson).toList();
+    return (response.data as List).map((e) => TrendPoint.fromJson(e as Map<String, dynamic>)).toList();
   }
 }
 
 class UnitApi extends BaseApi {
+  UnitApi(ApiClient api) : super(api);
   Future<PaginatedResponse<Unit>> getUnits({
     int page = 1,
     int limit = 20,
@@ -120,6 +126,7 @@ class UnitApi extends BaseApi {
 }
 
 class AmenityApi extends BaseApi {
+  AmenityApi(ApiClient api) : super(api);
   Future<PaginatedResponse<Amenity>> getAmenities({
     int page = 1,
     int limit = 20,
@@ -149,6 +156,7 @@ class AmenityApi extends BaseApi {
 }
 
 class ConfigApi extends BaseApi {
+  ConfigApi(ApiClient api) : super(api);
   Future<ComplexConfig> getComplexConfig() async {
     final response = await dio.get('/config/complex');
     return ComplexConfig.fromJson(response.data);

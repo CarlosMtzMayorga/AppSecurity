@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/booking.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/providers/app_providers.dart';
+import '../../../../core/models/booking.dart';
+import '../../../../core/models/user.dart';
 
 class BookingsScreen extends ConsumerStatefulWidget {
   const BookingsScreen({super.key});
@@ -149,6 +151,7 @@ class _BookingCard extends ConsumerWidget {
                   child: Text(_getStatusLabel(booking.status), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
                 ),
               ],
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -180,7 +183,6 @@ class _BookingCard extends ConsumerWidget {
             ],
           ),
         ),
-      ),
     );
   }
 

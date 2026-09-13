@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../network/api_client.dart';
+import '../network/api_response.dart';
+import 'app_providers.dart';
 import '../models/resident.dart';
-import '../models/visitor.dart';
 import '../models/access.dart';
 import '../models/payment.dart';
 import '../models/notice.dart';
@@ -12,6 +13,11 @@ import '../models/accounting.dart';
 import '../models/dashboard.dart';
 import '../models/unit.dart';
 import '../models/amenity.dart';
+import 'api_providers_part2.dart';
+import 'api_providers_part3.dart';
+
+export 'api_providers_part2.dart';
+export 'api_providers_part3.dart';
 
 final residentApiProvider = Provider<ResidentApi>((ref) => ResidentApi(ref.read(apiClientProvider)));
 final visitorApiProvider = Provider<VisitorApi>((ref) => VisitorApi(ref.read(apiClientProvider)));
@@ -33,6 +39,7 @@ class BaseApi {
 }
 
 class ResidentApi extends BaseApi {
+  ResidentApi(ApiClient api) : super(api);
   Future<PaginatedResponse<Resident>> getResidents({
     int page = 1,
     int limit = 20,
@@ -79,6 +86,7 @@ class ResidentApi extends BaseApi {
 }
 
 class VisitorApi extends BaseApi {
+  VisitorApi(ApiClient api) : super(api);
   Future<PaginatedResponse<Visitor>> getVisitors({
     int page = 1,
     int limit = 20,
@@ -91,7 +99,7 @@ class VisitorApi extends BaseApi {
 
   Future<List<Visitor>> getMyVisitors() async {
     final response = await dio.get('/visitors/my-visitors');
-    return (response.data as List).map(Visitor.fromJson).toList();
+    return (response.data as List).map((e) => Visitor.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Visitor> getVisitor(String id) async {
@@ -115,6 +123,7 @@ class VisitorApi extends BaseApi {
 }
 
 class AccessApi extends BaseApi {
+  AccessApi(ApiClient api) : super(api);
   Future<PaginatedResponse<AccessLog>> getAccessLogs({
     int page = 1,
     int limit = 20,
@@ -122,6 +131,7 @@ class AccessApi extends BaseApi {
     String? status,
     String? unitId,
     String? residentId,
+    String? search,
     DateTime? startDate,
     DateTime? endDate,
   }) async {
@@ -130,6 +140,7 @@ class AccessApi extends BaseApi {
     if (status != null) params['status'] = status;
     if (unitId != null) params['unitId'] = unitId;
     if (residentId != null) params['residentId'] = residentId;
+    if (search != null) params['search'] = search;
     if (startDate != null) params['startDate'] = startDate.toIso8601String();
     if (endDate != null) params['endDate'] = endDate.toIso8601String();
 
@@ -139,7 +150,7 @@ class AccessApi extends BaseApi {
 
   Future<List<AccessLog>> getActiveAccesses() async {
     final response = await dio.get('/access/active');
-    return (response.data as List).map(AccessLog.fromJson).toList();
+    return (response.data as List).map((e) => AccessLog.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<AccessLog> getAccessLog(String id) async {

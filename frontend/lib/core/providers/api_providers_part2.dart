@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import '../network/api_client.dart';
+import '../network/api_response.dart';
+import 'api_providers.dart';
 import '../models/payment.dart';
 import '../models/notice.dart';
 import '../models/booking.dart';
@@ -10,6 +12,7 @@ import '../models/unit.dart';
 import '../models/amenity.dart';
 
 class PaymentApi extends BaseApi {
+  PaymentApi(ApiClient api) : super(api);
   Future<PaginatedResponse<Payment>> getPayments({
     int page = 1,
     int limit = 20,
@@ -17,6 +20,7 @@ class PaymentApi extends BaseApi {
     String? type,
     String? residentId,
     String? unitId,
+    String? search,
     DateTime? startDate,
     DateTime? endDate,
   }) async {
@@ -25,6 +29,7 @@ class PaymentApi extends BaseApi {
     if (type != null) params['type'] = type;
     if (residentId != null) params['residentId'] = residentId;
     if (unitId != null) params['unitId'] = unitId;
+    if (search != null) params['search'] = search;
     if (startDate != null) params['startDate'] = startDate.toIso8601String();
     if (endDate != null) params['endDate'] = endDate.toIso8601String();
 
@@ -34,7 +39,7 @@ class PaymentApi extends BaseApi {
 
   Future<List<Payment>> getMyPayments() async {
     final response = await dio.get('/payments/my-payments');
-    return (response.data as List).map(Payment.fromJson).toList();
+    return (response.data as List).map((e) => Payment.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<PaymentSummary> getSummary({DateTime? startDate, DateTime? endDate}) async {
@@ -57,7 +62,7 @@ class PaymentApi extends BaseApi {
 
   Future<List<Payment>> createBulkPayments(Map<String, dynamic> data) async {
     final response = await dio.post('/payments/bulk', data: data);
-    return (response.data['payments'] as List).map(Payment.fromJson).toList();
+    return (response.data['payments'] as List).map((e) => Payment.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<String> createStripeIntent(String paymentId) async {
@@ -76,14 +81,17 @@ class PaymentApi extends BaseApi {
 }
 
 class NoticeApi extends BaseApi {
+  NoticeApi(ApiClient api) : super(api);
   Future<PaginatedResponse<Notice>> getNotices({
     int page = 1,
     int limit = 20,
     String? type,
+    String? search,
     bool? isPinned,
   }) async {
     final params = <String, dynamic>{'page': page, 'limit': limit};
     if (type != null) params['type'] = type;
+    if (search != null) params['search'] = search;
     if (isPinned != null) params['isPinned'] = isPinned;
 
     final response = await dio.get('/notices', queryParameters: params);
@@ -120,6 +128,7 @@ class NoticeApi extends BaseApi {
 }
 
 class BookingApi extends BaseApi {
+  BookingApi(ApiClient api) : super(api);
   Future<PaginatedResponse<Booking>> getBookings({
     int page = 1,
     int limit = 20,
@@ -142,14 +151,14 @@ class BookingApi extends BaseApi {
 
   Future<List<Booking>> getMyBookings() async {
     final response = await dio.get('/bookings/my-bookings');
-    return (response.data as List).map(Booking.fromJson).toList();
+    return (response.data as List).map((e) => Booking.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<BookingSlot>> getAvailability(String amenityId, {DateTime? date}) async {
     final params = <String, dynamic>{};
     if (date != null) params['date'] = date.toIso8601String().split('T')[0];
     final response = await dio.get('/bookings/availability/$amenityId', queryParameters: params);
-    return (response.data['slots'] as List).map(BookingSlot.fromJson).toList();
+    return (response.data['slots'] as List).map((e) => BookingSlot.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Booking> getBooking(String id) async {
@@ -173,6 +182,7 @@ class BookingApi extends BaseApi {
 }
 
 class ServiceApi extends BaseApi {
+  ServiceApi(ApiClient api) : super(api);
   Future<PaginatedResponse<ServiceRequest>> getServiceRequests({
     int page = 1,
     int limit = 20,
@@ -199,12 +209,12 @@ class ServiceApi extends BaseApi {
 
   Future<List<ServiceRequest>> getMyRequests() async {
     final response = await dio.get('/services/my-requests');
-    return (response.data as List).map(ServiceRequest.fromJson).toList();
+    return (response.data as List).map((e) => ServiceRequest.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<ServiceRequest>> getAssignedRequests() async {
     final response = await dio.get('/services/assigned');
-    return (response.data as List).map(ServiceRequest.fromJson).toList();
+    return (response.data as List).map((e) => ServiceRequest.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<ServiceRequestSummary> getSummary({DateTime? startDate, DateTime? endDate}) async {

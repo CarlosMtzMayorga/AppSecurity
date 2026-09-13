@@ -102,13 +102,12 @@ model User {
 
   resident      Resident?
   administered  ResidentialComplex[] @relation("ComplexAdmin")
-  accesses      AccessLog[]  @relation("AccessResident")
-  visitorAccess AccessLog[]  @relation("AccessVisitor")
   payments      Payment[]    @relation("PaymentUser")
   notices       Notice[]     @relation("NoticeAuthor")
   bookings      Booking[]    @relation("BookingUser")
   serviceRequests ServiceRequest[] @relation("ServiceRequestUser")
   serviceRequestsAssigned ServiceRequest[] @relation("ServiceRequestAssignee")
+  securityAccessLogs AccessLog[] @relation("AccessLogSecurityUser")
   tokens        AuthToken[]
 
   @@index([email])
@@ -157,6 +156,7 @@ model ResidentialComplex {
   accessLogs  AccessLog[]
   accountingEntries AccountingEntry[]
   accessConfigs AccessConfig[]
+  complexSettings ComplexSettings?
 
   @@index([adminId])
 }
@@ -211,7 +211,7 @@ model Resident {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  accesses      AccessLog[]
+  accesses      AccessLog[]  @relation("AccessResident")
   visitors      Visitor[]
   payments      Payment[]
   bookings      Booking[]
@@ -258,7 +258,7 @@ model AccessLog {
   visitorId       String?
   visitor         Visitor?    @relation(fields: [visitorId], references: [id], onDelete: SetNull)
   securityUserId  String?
-  securityUser    User?       @relation(fields: [securityUserId], references: [id], onDelete: SetNull)
+  securityUser    User?       @relation("AccessLogSecurityUser", fields: [securityUserId], references: [id], onDelete: SetNull)
   type            AccessType
   status          AccessStatus @default(PENDING)
   entryTime       DateTime?
@@ -413,6 +413,7 @@ model Booking {
   userId          String
   user            User           @relation("BookingUser", fields: [userId], references: [id], onDelete: Cascade)
   residentId      String
+  resident        Resident       @relation(fields: [residentId], references: [id], onDelete: Cascade)
   startTime       DateTime
   endTime         DateTime
   status          BookingStatus  @default(PENDING)
@@ -439,6 +440,8 @@ model ServiceRequest {
   unitId          String
   userId          String
   user            User                   @relation("ServiceRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  residentId      String?
+  resident        Resident?              @relation(fields: [residentId], references: [id], onDelete: SetNull)
   assigneeId      String?
   assignee        User?                  @relation("ServiceRequestAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   title           String

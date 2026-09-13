@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/service.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/models/service.dart';
 
 class ServiceDetailScreen extends ConsumerStatefulWidget {
   final String serviceId;

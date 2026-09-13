@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'user.dart';
 
 enum ServiceRequestPriority { low, medium, high, urgent }
 enum ServiceRequestStatus { open, inProgress, resolved, closed, rejected }

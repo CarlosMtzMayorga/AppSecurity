@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/service.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/providers/app_providers.dart';
+import '../../../../core/models/service.dart';
+import '../../../../core/models/user.dart';
 
 class ServicesScreen extends ConsumerStatefulWidget {
   const ServicesScreen({super.key});

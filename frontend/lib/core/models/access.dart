@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'user.dart';
 
 enum AccessType { resident, visitor, service, delivery, emergency }
 enum AccessStatus { pending, approved, rejected, expired, completed }
@@ -19,6 +20,8 @@ class AccessLog extends Equatable {
   final DateTime? scheduledExit;
   final String? entryMethod;
   final String? exitMethod;
+  final String? plateRecognized;
+  final bool faceRecognized;
   final String? notes;
   final DateTime createdAt;
 
@@ -38,6 +41,8 @@ class AccessLog extends Equatable {
     this.scheduledExit,
     this.entryMethod,
     this.exitMethod,
+    this.plateRecognized,
+    this.faceRecognized = false,
     this.notes,
     required this.createdAt,
   });
@@ -66,6 +71,8 @@ class AccessLog extends Equatable {
     scheduledExit: json['scheduledExit'] != null ? DateTime.parse(json['scheduledExit']) : null,
     entryMethod: json['entryMethod'],
     exitMethod: json['exitMethod'],
+    plateRecognized: json['plateRecognized'],
+    faceRecognized: json['faceRecognized'] ?? false,
     notes: json['notes'],
     createdAt: DateTime.parse(json['createdAt']),
   );

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart'
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/access.dart';
-import '../../../shared/widgets/custom_text_field.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/models/access.dart';
+import '../../../../core/models/resident.dart';
+import '../../../../shared/widgets/custom_text_field.dart';
 
 class AccessScreen extends ConsumerStatefulWidget {
   const AccessScreen({super.key});

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/providers/api_providers.dart';
-import '../../../core/models/visitor.dart';
-import '../../../shared/widgets/custom_text_field.dart';
-import '../../../shared/widgets/custom_button.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/providers/api_providers.dart';
+import '../../../../core/models/access.dart';
+import '../../../../core/models/resident.dart';
+import '../../../../shared/widgets/custom_text_field.dart';
+import '../../../../shared/widgets/custom_button.dart';
+import 'access_screen.dart';
 
 class VisitorManagementScreen extends ConsumerStatefulWidget {
   const VisitorManagementScreen({super.key});
@@ -51,7 +54,7 @@ class _VisitorManagementScreenState extends ConsumerState<VisitorManagementScree
             child: CustomSearchField(
               controller: _searchController,
               hint: 'Buscar visitantes...',
-              onChanged: (_) => ref.read(myVisitorsProvider.notifier).load(search: _searchController.text),
+              onChanged: (_) => ref.read(myVisitorsProvider.notifier).load(),
               onClear: () => ref.read(myVisitorsProvider.notifier).load(),
             ),
           ),
