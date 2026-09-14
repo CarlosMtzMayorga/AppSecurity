@@ -9,6 +9,7 @@ import {
   loginSchema,
   refreshTokenSchema,
   changePasswordSchema,
+  updateProfileSchema,
 } from '../validators/schemas.js';
 
 const router = Router();
@@ -274,6 +275,32 @@ router.get('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => 
   if (!user) {
     throw new AppError(404, 'Usuario no encontrado');
   }
+
+  res.json({ user: await buildUserPayload(user) });
+}));
+
+router.patch('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
+  const data = updateProfileSchema.parse(req.body);
+
+  const user = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+    },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      avatarUrl: true,
+      role: true,
+      createdAt: true,
+      lastLoginAt: true,
+    },
+  });
 
   res.json({ user: await buildUserPayload(user) });
 }));

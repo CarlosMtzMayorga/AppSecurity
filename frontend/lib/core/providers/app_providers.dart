@@ -120,6 +120,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> updateProfile({required String firstName, required String lastName, String? phone}) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _api.dio.patch('/auth/me', data: {'firstName': firstName, 'lastName': lastName, 'phone': phone});
+      final user = User.fromJson(response.data['user']);
+      state = state.copyWith(user: user, isLoading: false, error: null);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractError(e));
+      rethrow;
+    }
+  }
+
   String _extractError(dynamic e) {
     if (e is DioException) {
       return e.response?.data['error'] ?? e.message ?? 'Error desconocido';

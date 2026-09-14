@@ -26,7 +26,6 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final state = ref.watch(serviceDetailProvider(widget.serviceId));
 
     return Scaffold(
@@ -171,7 +170,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                   children: [
                     Text('Calificar Servicio', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 12),
-                    _RatingWidget(onRate: (rating) => _submitRating(request.id, rating)),
+                    _RatingWidget(onRate: (rating, feedback) => _submitRating(request.id, rating, feedback)),
                   ],
                 ),
               ),
@@ -182,8 +181,15 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     );
   }
 
-  void _submitRating(String id, int rating) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Calificación: $rating estrellas')));
+  Future<void> _submitRating(String id, int rating, String feedback) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(serviceApiProvider).rateService(id, rating: rating, feedback: feedback.isEmpty ? null : feedback.trim());
+      messenger.showSnackBar(const SnackBar(content: Text('Gracias por tu calificación'), backgroundColor: Colors.green));
+      await ref.read(serviceDetailProvider(widget.serviceId).notifier).load();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   Widget _DetailRow({required String label, required String value, required IconData icon, Color? valueColor}) {
@@ -218,7 +224,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
 }
 
 class _RatingWidget extends StatefulWidget {
-  final Function(int) onRate;
+  final void Function(int rating, String feedback) onRate;
   const _RatingWidget({required this.onRate});
   @override State<_RatingWidget> createState() => _RatingWidgetState();
 }
@@ -230,7 +236,6 @@ class _RatingWidgetState extends State<_RatingWidget> {
   @override void dispose() { _feedbackController.dispose(); super.dispose(); }
   
   @override Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       children: [
         Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) => IconButton(
@@ -240,7 +245,7 @@ class _RatingWidgetState extends State<_RatingWidget> {
         const SizedBox(height: 16),
         TextField(controller: _feedbackController, decoration: const InputDecoration(labelText: 'Comentario (opcional)', border: OutlineInputBorder()), maxLines: 3),
         const SizedBox(height: 16),
-        FilledButton(onPressed: _rating > 0 ? () => widget.onRate(_rating) : null, child: const Text('Enviar Calificación')),
+        FilledButton(onPressed: _rating > 0 ? () => widget.onRate(_rating, _feedbackController.text) : null, child: const Text('Enviar Calificación')),
       ],
     );
   }

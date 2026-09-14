@@ -42,7 +42,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final authState = ref.watch(authStateProvider);
     final isAdmin = authState.user?.role == UserRole.admin || authState.user?.role == UserRole.committee;
 
@@ -158,13 +157,25 @@ class _AllPaymentsTab extends ConsumerWidget {
   }
 }
 
-class _PaymentCard extends StatelessWidget {
+class _PaymentCard extends ConsumerWidget {
   final Payment payment;
   final VoidCallback onTap;
   const _PaymentCard({required this.payment, required this.onTap});
 
+  Future<void> _payNow(BuildContext context, WidgetRef ref, String id) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(paymentApiProvider).payPayment(id);
+      messenger.showSnackBar(const SnackBar(content: Text('Pago completado'), backgroundColor: Colors.green));
+      ref.read(myPaymentsProvider.notifier).load();
+      ref.read(paymentsProvider.notifier).loadPayments();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final statusColor = _getStatusColor(payment.status);
     final isOverdue = payment.isOverdue;
@@ -208,7 +219,7 @@ class _PaymentCard extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: () => _payNow(payment.id),
+                    onPressed: () => _payNow(context, ref, payment.id),
                     icon: const Icon(Icons.payment),
                     label: const Text('Pagar Ahora'),
                   ),
@@ -220,8 +231,6 @@ class _PaymentCard extends StatelessWidget {
       ),
     );
   }
-
-  void _payNow(String id) {}
 
   Color _getStatusColor(PaymentStatus s) {
     switch (s) {

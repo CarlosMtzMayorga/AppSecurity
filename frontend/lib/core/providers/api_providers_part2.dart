@@ -70,6 +70,10 @@ class PaymentApi extends BaseApi {
     return response.data['clientSecret'];
   }
 
+  Future<void> payPayment(String paymentId) async {
+    await dio.post('/payments/$paymentId/webhook/test');
+  }
+
   Future<Payment> updatePayment(String id, Map<String, dynamic> data) async {
     final response = await dio.patch('/payments/$id', data: data);
     return Payment.fromJson(response.data);
@@ -179,6 +183,11 @@ class BookingApi extends BaseApi {
   Future<void> deleteBooking(String id) async {
     await dio.delete('/bookings/$id');
   }
+
+  Future<Booking> cancelBooking(String id) async {
+    final response = await dio.patch('/bookings/$id', data: {'status': 'CANCELLED'});
+    return Booking.fromJson(response.data);
+  }
 }
 
 class ServiceApi extends BaseApi {
@@ -242,5 +251,10 @@ class ServiceApi extends BaseApi {
 
   Future<void> deleteServiceRequest(String id) async {
     await dio.delete('/services/$id');
+  }
+
+  Future<ServiceRequest> rateService(String id, {required int rating, String? feedback}) async {
+    final response = await dio.patch('/services/$id', data: {'rating': rating, 'feedback': feedback});
+    return ServiceRequest.fromJson(response.data);
   }
 }

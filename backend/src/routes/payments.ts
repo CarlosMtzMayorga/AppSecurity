@@ -173,6 +173,39 @@ router.post('/bulk', asyncHandler(async (req: AuthRequest, res) => {
   res.status(201).json({ created: payments.length, payments });
 }));
 
+router.post('/:id/webhook/test', asyncHandler(async (req: AuthRequest, res) => {
+  const payment = await prisma.payment.findFirst({
+    where: { id: req.params.id, complexId: req.user!.complexId },
+  });
+  if (!payment) throw new AppError(404, 'Pago no encontrado');
+  if (payment.status === 'COMPLETED') throw new AppError(400, 'Pago ya completado');
+
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: { status: 'COMPLETED', paidAt: new Date() },
+  });
+
+  const existing = await prisma.accountingEntry.findFirst({
+    where: { reference: payment.id },
+  });
+  if (!existing) {
+    await prisma.accountingEntry.create({
+      data: {
+        complexId: payment.complexId,
+        type: 'INCOME',
+        category: payment.type,
+        amount: payment.amount,
+        description: `Pago app - ${payment.reference}`,
+        reference: payment.id,
+        date: new Date(),
+        createdBy: req.user!.id,
+      },
+    });
+  }
+
+  res.json({ message: 'Pago completado' });
+}));
+
 router.post('/:id/stripe-intent', asyncHandler(async (req: AuthRequest, res) => {
   const payment = await prisma.payment.findFirst({
     where: { id: req.params.id, complexId: req.user!.complexId },

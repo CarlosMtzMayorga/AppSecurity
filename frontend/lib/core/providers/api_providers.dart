@@ -22,6 +22,7 @@ export 'api_providers_part3.dart';
 final residentApiProvider = Provider<ResidentApi>((ref) => ResidentApi(ref.read(apiClientProvider)));
 final visitorApiProvider = Provider<VisitorApi>((ref) => VisitorApi(ref.read(apiClientProvider)));
 final accessApiProvider = Provider<AccessApi>((ref) => AccessApi(ref.read(apiClientProvider)));
+final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.read(apiClientProvider)));
 final paymentApiProvider = Provider<PaymentApi>((ref) => PaymentApi(ref.read(apiClientProvider)));
 final noticeApiProvider = Provider<NoticeApi>((ref) => NoticeApi(ref.read(apiClientProvider)));
 final bookingApiProvider = Provider<BookingApi>((ref) => BookingApi(ref.read(apiClientProvider)));
@@ -217,4 +218,21 @@ class AccessStats {
     deliveries: json['deliveries'] ?? 0,
     active: json['active'] ?? 0,
   );
+}
+
+class AuthApi extends BaseApi {
+  AuthApi(ApiClient api) : super(api);
+  Future<Map<String, dynamic>> getMe() async {
+    final response = await dio.get('/auth/me');
+    return response.data['user'];
+  }
+
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    final response = await dio.patch('/auth/me', data: data);
+    return response.data['user'];
+  }
+
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    await dio.post('/auth/change-password', data: {'currentPassword': currentPassword, 'newPassword': newPassword});
+  }
 }

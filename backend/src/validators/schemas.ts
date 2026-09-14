@@ -33,6 +33,12 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, 'Mínimo 8 caracteres'),
 });
 
+export const updateProfileSchema = z.object({
+  firstName: z.string().min(1, 'Nombre requerido'),
+  lastName: z.string().min(1, 'Apellido requerido'),
+  phone: z.string().optional().nullable(),
+});
+
 export const createResidentSchema = z.object({
   email: z.string().email('Email inválido'),
   firstName: z.string().min(1),

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/providers/api_providers.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/models/service.dart';
 import '../../../../core/models/user.dart';
+import '../../../../shared/widgets/custom_text_field.dart';
 
 class ServicesScreen extends ConsumerStatefulWidget {
   const ServicesScreen({super.key});
@@ -31,7 +31,6 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final authState = ref.watch(authStateProvider);
     final isAdmin = authState.user?.role == UserRole.admin || authState.user?.role == UserRole.committee;
 
@@ -65,8 +64,119 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> with SingleTick
     );
   }
 
-  void _showCreateService() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Crear solicitud en desarrollo')));
+  Future<void> _showCreateService() async {
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (context) => const _CreateServiceDialog(),
+    );
+    if (created == true) {
+      ref.read(myServicesProvider.notifier).load();
+      ref.read(servicesProvider.notifier).load();
+    }
+  }
+}
+
+class _CreateServiceDialog extends ConsumerStatefulWidget {
+  const _CreateServiceDialog();
+
+  @override
+  ConsumerState<_CreateServiceDialog> createState() => _CreateServiceDialogState();
+}
+
+class _CreateServiceDialogState extends ConsumerState<_CreateServiceDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  String _category = 'general';
+  String _priority = 'medium';
+  bool _submitting = false;
+
+  static const _categories = ['general', 'plumbing', 'electrical', 'cleaning', 'security', 'appliances', 'other'];
+  static const _priorities = ['low', 'medium', 'high', 'urgent'];
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nueva Solicitud'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CustomTextField(
+                controller: _titleController,
+                label: 'Título',
+                hint: 'Ej: Reparación de grifo',
+                prefixIcon: Icons.title,
+                validator: (v) => v == null || v.trim().isEmpty ? 'El título es requerido' : null,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _descriptionController,
+                label: 'Descripción',
+                hint: 'Describe el problema en detalle',
+                prefixIcon: Icons.description,
+                maxLines: 4,
+                validator: (v) => v == null || v.trim().isEmpty ? 'La descripción es requerida' : null,
+              ),
+              const SizedBox(height: 16),
+              _buildDropdown('Categoría', _categories, _category, (v) => setState(() => _category = v!)),
+              const SizedBox(height: 12),
+              _buildDropdown('Prioridad', _priorities, _priority, (v) => setState(() => _priority = v!)),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Crear Solicitud'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdown(String label, List<String> items, String value, ValueChanged<String?> onChanged) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e[0].toUpperCase() + e.substring(1)))).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
+    try {
+      await ref.read(serviceApiProvider).createServiceRequest({
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'category': _category,
+        'priority': _priority,
+      });
+      if (mounted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solicitud creada')));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
   }
 }
 
@@ -157,7 +267,7 @@ class _ServiceCard extends ConsumerWidget {
             ),
             if (request.status == ServiceRequestStatus.resolved && request.rating == null) ...[
               const SizedBox(height: 12),
-              FilledButton.icon(onPressed: () => _rateService(request.id), icon: const Icon(Icons.star), label: const Text('Calificar Servicio')),
+              FilledButton.icon(onPressed: () => _rateService(context, ref, request.id), icon: const Icon(Icons.star), label: const Text('Calificar Servicio')),
             ],
           ],
         ),
@@ -165,7 +275,22 @@ class _ServiceCard extends ConsumerWidget {
     );
   }
 
-  void _rateService(String id) {}
+  Future<void> _rateService(BuildContext context, WidgetRef ref, String id) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) => const _RateServiceDialog(),
+    );
+    if (result == null) return;
+    try {
+      await ref.read(serviceApiProvider).rateService(id, rating: result);
+      messenger.showSnackBar(const SnackBar(content: Text('Gracias por tu calificación'), backgroundColor: Colors.green));
+      ref.read(myServicesProvider.notifier).load();
+      ref.read(servicesProvider.notifier).load();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
 
   Color _getStatusColor(ServiceRequestStatus s) {
     switch (s) {
@@ -184,6 +309,43 @@ class _ServiceCard extends ConsumerWidget {
       case ServiceRequestPriority.high: return Colors.orange;
       case ServiceRequestPriority.urgent: return Colors.red;
     }
+  }
+}
+
+class _RateServiceDialog extends StatefulWidget {
+  const _RateServiceDialog();
+
+  @override
+  State<_RateServiceDialog> createState() => _RateServiceDialogState();
+}
+
+class _RateServiceDialogState extends State<_RateServiceDialog> {
+  int _rating = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Calificar Servicio'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('¿Cómo calificas el servicio recibido?'),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(5, (i) => IconButton(
+              iconSize: 36,
+              icon: Icon(i < _rating ? Icons.star : Icons.star_border, color: Colors.amber),
+              onPressed: () => setState(() => _rating = i + 1),
+            )),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(onPressed: () => Navigator.pop(context, _rating), child: const Text('Enviar')),
+      ],
+    );
   }
 }
 

@@ -26,7 +26,6 @@ class _PaymentDetailScreenState extends ConsumerState<PaymentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final state = ref.watch(paymentDetailProvider(widget.paymentId));
 
     return Scaffold(
@@ -103,8 +102,15 @@ class _PaymentDetailScreenState extends ConsumerState<PaymentDetailScreen> {
     );
   }
 
-  void _payNow(Payment payment) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Procesando pago...')));
+  Future<void> _payNow(Payment payment) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(paymentApiProvider).payPayment(payment.id);
+      messenger.showSnackBar(const SnackBar(content: Text('Pago completado'), backgroundColor: Colors.green));
+      await ref.read(paymentDetailProvider(widget.paymentId).notifier).load();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   Widget _DetailRow({required String label, required String value, required IconData icon, Color? valueColor, bool monospace = false}) {
