@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../config/app_config.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/models/user.dart';
 
@@ -74,15 +75,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  String _resolveAvatarUrl(String? avatarUrl) {
+    if (avatarUrl == null) return '';
+    if (avatarUrl.startsWith('http')) return avatarUrl;
+    final base = AppConfig.baseUrl.replaceAll(RegExp(r'/api/v1$'), '');
+    return '$base$avatarUrl';
+  }
+
   Widget _buildAvatar(User user) {
     final theme = Theme.of(context);
+    final avatarUrl = _resolveAvatarUrl(user.avatarUrl);
     return Stack(
       children: [
         CircleAvatar(
           radius: 60,
           backgroundColor: theme.colorScheme.primaryContainer,
-          backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
-          child: user.avatarUrl == null
+          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+          child: avatarUrl.isEmpty
               ? Text(
                   user.firstName.isNotEmpty ? user.firstName[0].toUpperCase() : 'U',
                   style: theme.textTheme.displayLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
@@ -273,10 +282,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _pickImage() async {
     final messenger = ScaffoldMessenger.of(context);
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      // TODO: Upload avatar
-      messenger.showSnackBar(const SnackBar(content: Text('Subida de avatar en desarrollo')));
+    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+    if (image == null) return;
+    try {
+      final bytes = await image.readAsBytes();
+      final filename = image.name.split('/').last.split('\\').last;
+      await ref.read(authStateProvider.notifier).uploadAvatar(bytes, filename);
+      if (mounted) {
+        messenger.showSnackBar(const SnackBar(content: Text('Foto de perfil actualizada')));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
 

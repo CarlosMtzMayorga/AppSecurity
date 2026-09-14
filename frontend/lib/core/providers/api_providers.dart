@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'dart:typed_data';
 import '../network/api_client.dart';
 import '../network/api_response.dart';
 import 'app_providers.dart';
@@ -229,6 +230,14 @@ class AuthApi extends BaseApi {
 
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
     final response = await dio.patch('/auth/me', data: data);
+    return response.data['user'];
+  }
+
+  Future<Map<String, dynamic>> uploadAvatar(Uint8List bytes, String filename) async {
+    final formData = FormData.fromMap({
+      'avatar': MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    final response = await dio.post('/auth/avatar', data: formData);
     return response.data['user'];
   }
 

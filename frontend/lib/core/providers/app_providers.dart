@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -124,6 +125,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await _api.dio.patch('/auth/me', data: {'firstName': firstName, 'lastName': lastName, 'phone': phone});
+      final user = User.fromJson(response.data['user']);
+      state = state.copyWith(user: user, isLoading: false, error: null);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractError(e));
+      rethrow;
+    }
+  }
+
+  Future<void> uploadAvatar(Uint8List bytes, String filename) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final formData = FormData.fromMap({
+        'avatar': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final response = await _api.dio.post('/auth/avatar', data: formData);
       final user = User.fromJson(response.data['user']);
       state = state.copyWith(user: user, isLoading: false, error: null);
     } catch (e) {

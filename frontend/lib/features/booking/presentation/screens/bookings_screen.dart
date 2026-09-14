@@ -65,7 +65,11 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> with SingleTick
   }
 
   void _showCalendar() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Calendario en desarrollo')));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => const _BookingCalendarSheet(),
+    );
   }
 
   Future<void> _showCreateBooking() async {
@@ -455,6 +459,212 @@ class _BookingCard extends ConsumerWidget {
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.toString())));
     }
+  }
+
+  Color _getStatusColor(BookingStatus s) {
+    switch (s) {
+      case BookingStatus.confirmed: return Colors.green;
+      case BookingStatus.pending: return Colors.orange;
+      case BookingStatus.cancelled: return Colors.grey;
+      case BookingStatus.completed: return Colors.blue;
+      case BookingStatus.rejected: return Colors.red;
+    }
+  }
+
+  String _getStatusLabel(BookingStatus s) {
+    switch (s) {
+      case BookingStatus.confirmed: return 'Confirmada';
+      case BookingStatus.pending: return 'Pendiente';
+      case BookingStatus.cancelled: return 'Cancelada';
+      case BookingStatus.completed: return 'Completada';
+      case BookingStatus.rejected: return 'Rechazada';
+    }
+  }
+}
+
+class _BookingCalendarSheet extends ConsumerStatefulWidget {
+  const _BookingCalendarSheet();
+
+  @override
+  ConsumerState<_BookingCalendarSheet> createState() => _BookingCalendarSheetState();
+}
+
+class _BookingCalendarSheetState extends ConsumerState<_BookingCalendarSheet> {
+  late DateTime _visibleMonth;
+  DateTime? _selectedDay;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _visibleMonth = DateTime(now.year, now.month);
+  }
+
+  void _changeMonth(int delta) {
+    setState(() {
+      final next = DateTime(_visibleMonth.year, _visibleMonth.month + delta);
+      final now = DateTime.now();
+      // No permitir ir antes del mes actual
+      if (next.isBefore(DateTime(now.year, now.month))) return;
+      _visibleMonth = next;
+      _selectedDay = null;
+    });
+  }
+
+  List<Booking> _bookingsForDay(List<Booking> bookings, DateTime day) {
+    return bookings.where((b) {
+      final start = b.startTime;
+      return start.year == day.year && start.month == day.month && start.day == day.day;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final state = ref.watch(myBookingsProvider);
+    final bookings = state.bookings;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final filtered = _selectedDay != null ? _bookingsForDay(bookings, _selectedDay!) : <Booking>[];
+    final selectedBookings = filtered..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.6,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('Calendario de Reservas',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+                ),
+                IconButton(onPressed: () => _changeMonth(-1), icon: const Icon(Icons.chevron_left)),
+                Text(DateFormat('MMMM yyyy', 'es').format(_visibleMonth),
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                IconButton(onPressed: () => _changeMonth(1), icon: const Icon(Icons.chevron_right)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildCalendarGrid(theme, bookings, today),
+          ),
+          const Divider(height: 24),
+          Expanded(
+            child: state.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : selectedBookings.isEmpty
+                    ? _EmptyState(
+                        icon: Icons.event_busy,
+                        title: _selectedDay == null ? 'Toca un día para ver reservas' : 'Sin reservas este día',
+                        subtitle: 'Las reservas se marcan en el calendario',
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        itemCount: selectedBookings.length,
+                        itemBuilder: (context, index) {
+                          final b = selectedBookings[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: _getStatusColor(b.status).withValues(alpha: 0.15),
+                                child: const Icon(Icons.meeting_room, size: 20),
+                              ),
+                              title: Text(b.amenity.name),
+                              subtitle: Text('${b.unit.displayNumber} • ${DateFormat('HH:mm').format(b.startTime)} - ${DateFormat('HH:mm').format(b.endTime)} (${b.guestsCount} inv.)'),
+                              trailing: Text(_getStatusLabel(b.status),
+                                  style: TextStyle(fontWeight: FontWeight.w600, color: _getStatusColor(b.status))),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarGrid(ThemeData theme, List<Booking> bookings, DateTime today) {
+    final firstDay = DateTime(_visibleMonth.year, _visibleMonth.month, 1);
+    final daysInMonth = DateTime(_visibleMonth.year, _visibleMonth.month + 1, 0).day;
+    final leadingBlanks = firstDay.weekday % 7; // Domingo = 0
+    final cellCount = leadingBlanks + daysInMonth;
+    final rows = (cellCount / 7).ceil();
+
+    final dayNames = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+
+    return Column(
+      children: [
+        Row(
+          children: dayNames.asMap().entries.map((e) => Expanded(
+            child: Center(
+              child: Text(dayNames[e.key], style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700)),
+            ),
+          )).toList(),
+        ),
+        const SizedBox(height: 4),
+        for (int row = 0; row < rows; row++)
+          Row(
+            children: List.generate(7, (col) {
+              final index = row * 7 + col;
+              final dayNumber = index - leadingBlanks + 1;
+              if (dayNumber < 1 || dayNumber > daysInMonth) return const Expanded(child: SizedBox());
+              final day = DateTime(_visibleMonth.year, _visibleMonth.month, dayNumber);
+              final daysBookings = _bookingsForDay(bookings, day);
+              final isToday = day == today;
+              final isSelected = _selectedDay != null && day == _selectedDay;
+              return Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => setState(() => _selectedDay = day),
+                  child: Container(
+                    height: 44,
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? theme.colorScheme.primary : (isToday ? theme.colorScheme.primaryContainer : null),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '$dayNumber',
+                          style: TextStyle(
+                            fontWeight: isToday || isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? theme.colorScheme.onPrimary : null,
+                          ),
+                        ),
+                        if (daysBookings.isNotEmpty)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: daysBookings.take(4).map((b) => Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isSelected ? theme.colorScheme.onPrimary : _getStatusColor(b.status),
+                              ),
+                            )).toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+      ],
+    );
   }
 
   Color _getStatusColor(BookingStatus s) {

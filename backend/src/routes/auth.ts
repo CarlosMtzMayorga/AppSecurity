@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import fs from 'node:fs';
+import path from 'node:path';
+import multer from 'multer';
 import { prisma } from '../index.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
@@ -13,6 +16,30 @@ import {
 } from '../validators/schemas.js';
 
 const router = Router();
+
+const UPLOAD_DIR = path.resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads');
+const AVATAR_DIR = path.join(UPLOAD_DIR, 'avatars');
+
+const avatarStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    fs.mkdirSync(AVATAR_DIR, { recursive: true });
+    cb(null, AVATAR_DIR);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    cb(null, `avatar-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760', 10) },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new AppError(400, 'Solo se permiten imágenes (jpeg, png, webp, gif)'));
+  },
+});
 
 const generateTokens = (user: { id: string; email: string; role: string }) => {
   const accessToken = jwt.sign(
@@ -254,6 +281,40 @@ router.post('/change-password', authMiddleware, asyncHandler(async (req: AuthReq
   await prisma.authToken.deleteMany({ where: { userId: user.id } });
 
   res.json({ message: 'Contraseña actualizada. Inicia sesión nuevamente.' });
+}));
+
+router.post('/avatar', authMiddleware, avatarUpload.single('avatar'), asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.file) throw new AppError(400, 'Se requiere un archivo de imagen');
+
+  const avatarPath = `/uploads/avatars/${req.file.filename}`;
+
+  const previous = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { avatarUrl: true },
+  });
+
+  const user = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { avatarUrl: avatarPath },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      avatarUrl: true,
+      role: true,
+      createdAt: true,
+      lastLoginAt: true,
+    },
+  });
+
+  if (previous?.avatarUrl?.startsWith('/uploads/avatars/')) {
+    const oldPath = path.join(UPLOAD_DIR, 'avatars', path.basename(previous.avatarUrl));
+    fs.unlink(oldPath, () => {});
+  }
+
+  res.json({ user: await buildUserPayload(user) });
 }));
 
 router.get('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => {

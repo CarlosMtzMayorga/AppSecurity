@@ -161,7 +161,7 @@ class _VisitorCard extends ConsumerWidget {
   }
 
   void _editVisitor(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Edición de visitantes próximamente')));
+    showDialog(context: context, builder: (context) => _EditVisitorDialog(visitor: visitor, onSuccess: onChanged));
   }
 
   Future<void> _deleteVisitor(BuildContext context, WidgetRef ref, String id) async {
@@ -277,6 +277,118 @@ class _AddVisitorDialogState extends ConsumerState<_AddVisitorDialog> {
         'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       });
       if (mounted) { Navigator.pop(context); widget.onSuccess(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Visitante registrado'))); }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally { if (mounted) setState(() => _isLoading = false); }
+  }
+}
+
+class _EditVisitorDialog extends ConsumerStatefulWidget {
+  final Visitor visitor;
+  final VoidCallback onSuccess;
+
+  const _EditVisitorDialog({required this.visitor, required this.onSuccess});
+
+  @override
+  ConsumerState<_EditVisitorDialog> createState() => _EditVisitorDialogState();
+}
+
+class _EditVisitorDialogState extends ConsumerState<_EditVisitorDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _firstNameController = TextEditingController(text: widget.visitor.firstName);
+  late final _lastNameController = TextEditingController(text: widget.visitor.lastName);
+  late final _phoneController = TextEditingController(text: widget.visitor.phone ?? '');
+  late final _emailController = TextEditingController(text: widget.visitor.email ?? '');
+  late final _documentTypeController = TextEditingController(text: widget.visitor.documentType ?? '');
+  late final _documentNumberController = TextEditingController(text: widget.visitor.documentNumber ?? '');
+  late final _vehiclePlateController = TextEditingController(text: widget.visitor.vehiclePlate ?? '');
+  late final _notesController = TextEditingController(text: widget.visitor.notes ?? '');
+  late bool _isRecurring = widget.visitor.isRecurring;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    _documentTypeController.dispose();
+    _documentNumberController.dispose();
+    _vehiclePlateController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Editar Visitante'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                Expanded(child: CustomTextField(controller: _firstNameController, label: 'Nombre', validator: (v) => v?.isEmpty == true ? 'Requerido' : null)),
+                const SizedBox(width: 12),
+                Expanded(child: CustomTextField(controller: _lastNameController, label: 'Apellido', validator: (v) => v?.isEmpty == true ? 'Requerido' : null)),
+              ]),
+              const SizedBox(height: 16),
+              CustomTextField(controller: _phoneController, label: 'Teléfono', keyboardType: TextInputType.phone),
+              const SizedBox(height: 16),
+              CustomTextField(controller: _emailController, label: 'Email (opcional)', keyboardType: TextInputType.emailAddress),
+              const SizedBox(height: 16),
+              CustomTextField(controller: _vehiclePlateController, label: 'Placa del vehículo (opcional)'),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(child: CustomTextField(controller: _documentTypeController, label: 'Tipo documento (INE, Pasaporte, etc.)')),
+                const SizedBox(width: 12),
+                Expanded(child: CustomTextField(controller: _documentNumberController, label: 'Número documento')),
+              ]),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Visitante recurrente'),
+                value: _isRecurring,
+                onChanged: (v) => setState(() => _isRecurring = v),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(controller: _notesController, label: 'Notas (opcional)', maxLines: 2),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _isLoading ? null : _submit,
+          child: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Guardar'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(visitorApiProvider).updateVisitor(widget.visitor.id, {
+        'firstName': _firstNameController.text.trim(),
+        'lastName': _lastNameController.text.trim(),
+        'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        'email': _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+        'vehiclePlate': _vehiclePlateController.text.trim().isEmpty ? null : _vehiclePlateController.text.trim(),
+        'documentType': _documentTypeController.text.trim().isEmpty ? null : _documentTypeController.text.trim(),
+        'documentNumber': _documentNumberController.text.trim().isEmpty ? null : _documentNumberController.text.trim(),
+        'isRecurring': _isRecurring,
+        'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      });
+      if (mounted) {
+        Navigator.pop(context);
+        widget.onSuccess();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Visitante actualizado')));
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally { if (mounted) setState(() => _isLoading = false); }
