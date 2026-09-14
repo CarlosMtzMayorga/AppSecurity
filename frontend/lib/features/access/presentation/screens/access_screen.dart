@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/providers/api_providers.dart';
+import '../../../../core/providers/app_providers.dart';
 import '../../../../core/models/access.dart';
 import '../../../../core/models/resident.dart';
+import '../../../../core/models/user.dart';
 import '../../../../shared/widgets/custom_text_field.dart';
 
 class AccessScreen extends ConsumerStatefulWidget {
@@ -18,10 +21,13 @@ class _AccessScreenState extends ConsumerState<AccessScreen> with SingleTickerPr
   late TabController _tabController;
   final _searchController = TextEditingController();
 
+  bool get _isResident => ref.read(authStateProvider).user?.role == UserRole.resident;
+  int get _tabCount => _isResident ? 4 : 3;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: _tabCount, vsync: this);
     _loadData();
   }
 
@@ -41,18 +47,28 @@ class _AccessScreenState extends ConsumerState<AccessScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
+    final isResident = _isResident;
+
+    final tabs = <Tab>[
+      if (isResident) const Tab(text: 'Control', icon: Icon(Icons.sensors, size: 20)),
+      const Tab(text: 'Activos', icon: Icon(Icons.directions_walk, size: 20)),
+      const Tab(text: 'Historial', icon: Icon(Icons.history, size: 20)),
+      const Tab(text: 'Visitantes', icon: Icon(Icons.person_add, size: 20)),
+    ];
+
+    final children = <Widget>[
+      if (isResident) _GateControlTab(onRefresh: _loadData),
+      _ActiveAccessesTab(onRefresh: _loadData),
+      _AccessLogsTab(onRefresh: _loadData, searchController: _searchController),
+      const _VisitorsTab(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Control de Accesos'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Activos', icon: Icon(Icons.directions_walk)),
-            Tab(text: 'Historial', icon: Icon(Icons.history)),
-            Tab(text: 'Visitantes', icon: Icon(Icons.person_add)),
-          ],
+          tabs: tabs,
         ),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
@@ -61,26 +77,216 @@ class _AccessScreenState extends ConsumerState<AccessScreen> with SingleTickerPr
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _ActiveAccessesTab(onRefresh: _loadData),
-          _AccessLogsTab(onRefresh: _loadData, searchController: _searchController),
-          const _VisitorsTab(),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showEntryDialog(),
-        icon: const Icon(Icons.login),
-        label: const Text('Registrar Entrada'),
+        children: children,
       ),
     );
   }
 
-  void _showEntryDialog() {
-    showDialog(context: context, builder: (context) => const _EntryDialog());
-  }
-
   void _scanQr() {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Escáner QR en desarrollo')));
+  }
+}
+
+class _GateControlTab extends ConsumerWidget {
+  final VoidCallback onRefresh;
+
+  const _GateControlTab({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Row(children: [
+          Icon(Icons.info_outline, size: 18, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Mantén presionado el botón durante 2 segundos para abrir',
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+        ]),
+        const SizedBox(height: 28),
+        GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 24,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _GateButton(number: '1', label: 'Entrada', icon: Icons.login, color: const Color(0xFF16A34A),
+              onActivate: () => _gateEntry(context, ref)),
+            _GateButton(number: '2', label: 'Salida', icon: Icons.logout, color: const Color(0xFFDC2626),
+              onActivate: () => _gateExit(context, ref)),
+            _GateButton(number: '3', label: 'Peatonal', icon: Icons.directions_walk, color: const Color(0xFF4F46E5),
+              onActivate: () => _gatePeatonal(context, ref)),
+            _GateButton(number: '4', label: 'Botonera', icon: Icons.doorbell, color: const Color(0xFFEA580C),
+              onActivate: () => _gateBotonera(context, ref)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton.icon(
+            onPressed: onRefresh,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Actualizar accesos'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _run(BuildContext context, WidgetRef ref, Future<void> Function() action, String okMessage) async {
+    try {
+      await action();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(okMessage), backgroundColor: Colors.green));
+      }
+      ref.read(activeAccessesProvider.notifier).loadActive();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_gateError(e))));
+      }
+    }
+  }
+
+  String _gateError(dynamic e) {
+    final s = e.toString();
+    if (s.contains('No hay entrada activa')) return 'No hay entrada activa para registrar salida';
+    if (s.contains('Solo residentes')) return 'Acción disponible solo para residentes';
+    return 'No se pudo completar la acción';
+  }
+
+  Future<void> _gateEntry(BuildContext context, WidgetRef ref) =>
+      _run(context, ref, () => ref.read(accessApiProvider).residentEntry().then((_) {}), 'Entrada registrada');
+
+  Future<void> _gateExit(BuildContext context, WidgetRef ref) =>
+      _run(context, ref, () => ref.read(accessApiProvider).residentExit().then((_) {}), 'Salida registrada');
+
+  Future<void> _gatePeatonal(BuildContext context, WidgetRef ref) =>
+      _run(context, ref, () => ref.read(accessApiProvider).peatonalEntry().then((_) {}), 'Puerta peatonal abierta');
+
+  Future<void> _gateBotonera(BuildContext context, WidgetRef ref) =>
+      _run(context, ref, () => ref.read(accessApiProvider).openBotonera(), 'Botonera activada');
+}
+
+class _GateButton extends StatefulWidget {
+  final String number;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Future<void> Function() onActivate;
+
+  const _GateButton({required this.number, required this.label, required this.icon, required this.color, required this.onActivate});
+
+  @override
+  State<_GateButton> createState() => _GateButtonState();
+}
+
+class _GateButtonState extends State<_GateButton> {
+  static const _holdMs = 2000;
+
+  Timer? _timer;
+  final Stopwatch _hold = Stopwatch();
+  double _progress = 0;
+  bool _loading = false;
+
+  void _onHoldStart() {
+    if (_loading) return;
+    _hold
+      ..reset()
+      ..start();
+    setState(() => _progress = 0);
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(milliseconds: 40), (t) {
+      final p = _hold.elapsedMilliseconds / _holdMs;
+      setState(() => _progress = p.clamp(0.0, 1.0));
+      if (p >= 1.0) {
+        t.cancel();
+        _activate();
+      }
+    });
+  }
+
+  void _onHoldEnd() {
+    _hold..stop()..reset();
+    _timer?.cancel();
+    if (!_loading && mounted) setState(() => _progress = 0);
+  }
+
+  Future<void> _activate() async {
+    _hold..stop()..reset();
+    _timer?.cancel();
+    setState(() => _loading = true);
+    try {
+      await widget.onActivate();
+    } finally {
+      if (mounted) setState(() {
+        _loading = false;
+        _progress = 0;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTapDown: (_) => _onHoldStart(),
+      onTapUp: (_) => _onHoldEnd(),
+      onTapCancel: _onHoldEnd,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 116,
+            height: 116,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: _loading ? null : _progress,
+                  strokeWidth: 6,
+                  backgroundColor: widget.color.withOpacity(0.12),
+                  valueColor: AlwaysStoppedAnimation(widget.color),
+                ),
+                Container(
+                  width: 92,
+                  height: 92,
+                  decoration: BoxDecoration(
+                    color: widget.color,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: widget.color.withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 6)),
+                    ],
+                  ),
+                  child: _loading
+                      ? const Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(widget.icon, color: Colors.white, size: 26),
+                            const SizedBox(height: 2),
+                            Text(widget.number,
+                                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, height: 1.0)),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(widget.label, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
   }
 }
 
@@ -104,7 +310,7 @@ class _ActiveAccessesTab extends ConsumerWidget {
                   itemCount: state.activeAccesses.length,
                   itemBuilder: (context, index) {
                     final access = state.activeAccesses[index];
-                    return _AccessCard(access: access, showExitButton: true);
+                    return _AccessCard(access: access, showExitButton: true, onRefresh: onRefresh);
                   },
                 ),
     );
@@ -182,7 +388,14 @@ class _VisitorsTab extends ConsumerWidget {
                         leading: CircleAvatar(child: Text(visitor.firstName[0].toUpperCase())),
                         title: Text(visitor.fullName),
                         subtitle: Text('${visitor.phone ?? 'Sin teléfono'} • ${visitor.isRecurring ? 'Recurrente' : 'Único'}'),
-                        trailing: IconButton(icon: const Icon(Icons.delete), onPressed: () => _deleteVisitor(visitor.id)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (visitor.entryCode != null)
+                              IconButton(icon: const Icon(Icons.qr_code_2), tooltip: 'Token de acceso', onPressed: () => showVisitorTokenDialog(context, visitor)),
+                            IconButton(icon: const Icon(Icons.delete), onPressed: () => _deleteVisitor(context, ref, visitor.id)),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -190,16 +403,23 @@ class _VisitorsTab extends ConsumerWidget {
     );
   }
 
-  void _deleteVisitor(String id) {
-    // Implementation
+  void _deleteVisitor(BuildContext context, WidgetRef ref, String id) {
+    try {
+      ref.read(visitorApiProvider).deleteVisitor(id);
+      ref.read(myVisitorsProvider.notifier).load();
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Visitante eliminado')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 }
 
 class _AccessCard extends ConsumerWidget {
   final AccessLog access;
   final bool showExitButton;
+  final VoidCallback? onRefresh;
   
-  const _AccessCard({required this.access, this.showExitButton = false});
+  const _AccessCard({required this.access, this.showExitButton = false, this.onRefresh});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -244,7 +464,7 @@ class _AccessCard extends ConsumerWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _registerExit(access.id),
+                  onPressed: () => _registerExit(context, ref),
                   icon: const Icon(Icons.logout),
                   label: const Text('Registrar Salida'),
                   style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
@@ -257,8 +477,17 @@ class _AccessCard extends ConsumerWidget {
     );
   }
 
-  void _registerExit(String id) {
-    // Implementation
+  Future<void> _registerExit(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(accessApiProvider).registerExit(access.id);
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salida registrada'), backgroundColor: Colors.green));
+      onRefresh?.call();
+    } catch (e) {
+      if (context.mounted) {
+        final s = e.toString();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.contains('No hay entrada activa') ? 'No hay entrada activa' : 'No se pudo registrar la salida')));
+      }
+    }
   }
   
   Color _getStatusColor(AccessStatus status) {
@@ -269,71 +498,6 @@ class _AccessCard extends ConsumerWidget {
       case AccessStatus.completed: return Colors.blue;
       default: return Colors.grey;
     }
-  }
-}
-
-class _EntryDialog extends ConsumerStatefulWidget {
-  const _EntryDialog();
-
-  @override
-  ConsumerState<_EntryDialog> createState() => _EntryDialogState();
-}
-
-class _EntryDialogState extends ConsumerState<_EntryDialog> {
-  String _type = 'VISITOR';
-  final _visitorController = TextEditingController();
-  final _plateController = TextEditingController();
-  final _notesController = TextEditingController();
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _visitorController.dispose();
-    _plateController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Registrar Entrada'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'VISITOR', label: Text('Visitante'), icon: Icon(Icons.person_add)),
-                ButtonSegment(value: 'SERVICE', label: Text('Servicio'), icon: Icon(Icons.build)),
-                ButtonSegment(value: 'DELIVERY', label: Text('Entrega'), icon: Icon(Icons.local_shipping)),
-              ],
-              selected: {_type},
-              onSelectionChanged: (s) => setState(() => _type = s.first),
-            ),
-            const SizedBox(height: 16),
-            if (_type == 'VISITOR') ...[
-              TextField(controller: _visitorController, decoration: const InputDecoration(labelText: 'Nombre del visitante', border: OutlineInputBorder())),
-              const SizedBox(height: 12),
-            ],
-            TextField(controller: _plateController, decoration: const InputDecoration(labelText: 'Placa del vehículo (opcional)', border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notas (opcional)', border: OutlineInputBorder()), maxLines: 2),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(
-          onPressed: _isLoading ? null : _register,
-          child: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Registrar'),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _register() async {
-    // Implementation
   }
 }
 
@@ -357,6 +521,51 @@ class _EmptyState extends StatelessWidget {
           Text(subtitle, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         ],
       ),
+    );
+  }
+}
+
+void showVisitorTokenDialog(BuildContext context, Visitor visitor) {
+  final code = visitor.entryCode;
+  if (code == null || code.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este visitante no tiene token de acceso')));
+    return;
+  }
+  showDialog(context: context, builder: (_) => _VisitorTokenDialog(visitor: visitor, code: code));
+}
+
+class _VisitorTokenDialog extends StatelessWidget {
+  final Visitor visitor;
+  final String code;
+
+  const _VisitorTokenDialog({required this.visitor, required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('Token de acceso'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Muestra este código en la caseta para permitir la entrada de ${visitor.fullName}',
+              textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 16),
+          QrImageView(data: code, version: QrVersions.auto, size: 180),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(code, style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 5, fontWeight: FontWeight.w700, fontFamily: 'monospace')),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+      ],
     );
   }
 }

@@ -70,6 +70,7 @@ export const createVisitorSchema = z.object({
   recurringDays: z.array(z.number().int().min(0).max(6)).optional(),
   recurringStart: z.string().datetime().optional(),
   recurringEnd: z.string().datetime().optional(),
+  entryCode: z.string().optional(),
   notes: z.string().optional(),
 });
 

@@ -26,7 +26,6 @@ class _AccessDetailScreenState extends ConsumerState<AccessDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final state = ref.watch(accessDetailProvider(widget.accessId));
 
     return Scaffold(
@@ -101,7 +100,18 @@ class _AccessDetailScreenState extends ConsumerState<AccessDetailScreen> {
     );
   }
 
-  void _registerExit(String id) {}
+  Future<void> _registerExit(String id) async {
+    try {
+      await ref.read(accessApiProvider).registerExit(id);
+      await ref.read(accessDetailProvider(widget.accessId).notifier).load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salida registrada'), backgroundColor: Colors.green));
+    } catch (e) {
+      if (mounted) {
+        final s = e.toString();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.contains('No hay entrada activa') ? 'No hay entrada activa' : 'No se pudo registrar la salida')));
+      }
+    }
+  }
 
   Widget _DetailRow({required String label, required String value, required IconData icon, Color? valueColor}) {
     final theme = Theme.of(context);

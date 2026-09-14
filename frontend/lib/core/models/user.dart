@@ -46,7 +46,7 @@ class User extends Equatable {
       residentStatus: json['residentStatus'],
       unit: json['unit'] != null ? UnitInfo.fromJson(json['unit']) : null,
       lastLoginAt: json['lastLoginAt'] != null ? DateTime.parse(json['lastLoginAt']) : null,
-      createdAt: DateTime.parse(json['createdAt']),
+      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 

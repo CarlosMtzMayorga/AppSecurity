@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { prisma } from '../index.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { AuthRequest } from '../middleware/auth.js';
@@ -9,6 +10,15 @@ import {
 } from '../validators/schemas.js';
 
 const router = Router();
+
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+const randomEntryCode = () => {
+  const bytes = crypto.randomBytes(8);
+  let code = '';
+  for (let i = 0; i < 8; i++) code += ALPHABET[bytes[i] % ALPHABET.length];
+  return code;
+};
 
 router.get('/', asyncHandler(async (req: AuthRequest, res) => {
   const { page, limit, sortBy, sortOrder } = paginationSchema.parse(req.query);
@@ -85,7 +95,7 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
   }
 
   const visitor = await prisma.visitor.create({
-    data: { ...data, residentId },
+    data: { ...data, residentId, entryCode: data.entryCode || randomEntryCode() },
     include: { resident: { select: { user: { select: { firstName: true, lastName: true } } } } },
   });
 

@@ -29,6 +29,55 @@ const generateTokens = (user: { id: string; email: string; role: string }) => {
   return { accessToken, refreshToken };
 };
 
+const buildUserPayload = async (user: {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  avatarUrl: string | null;
+  role: string;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+}) => {
+  let complexId: string | undefined;
+  let residentStatus: string | undefined;
+  let unit: { id: string; number: string; block: string | null } | undefined;
+
+  if (user.role === 'RESIDENT' || user.role === 'SECURITY' || user.role === 'COMMITTEE') {
+    const resident = await prisma.resident.findUnique({
+      where: { userId: user.id },
+      select: { complexId: true, status: true, unit: { select: { id: true, number: true, block: true } } },
+    });
+    if (resident) {
+      complexId = resident.complexId;
+      residentStatus = resident.status;
+      unit = resident.unit;
+    }
+  } else if (user.role === 'ADMIN') {
+    const complex = await prisma.residentialComplex.findFirst({
+      where: { adminId: user.id, isActive: true },
+      select: { id: true },
+    });
+    complexId = complex?.id;
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: user.phone,
+    avatarUrl: user.avatarUrl,
+    role: user.role,
+    createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt,
+    complexId,
+    residentStatus,
+    unit,
+  };
+};
+
 router.post('/register', asyncHandler(async (req, res) => {
   const data = registerSchema.parse(req.body);
   
@@ -82,13 +131,7 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   res.status(201).json({
     message: 'Usuario registrado exitosamente',
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-    },
+    user: await buildUserPayload(user),
     ...tokens,
   });
 }));
@@ -124,34 +167,9 @@ router.post('/login', asyncHandler(async (req, res) => {
     },
   });
 
-  let complexId: string | undefined;
-  if (user.role === 'RESIDENT' || user.role === 'SECURITY' || user.role === 'COMMITTEE') {
-    const resident = await prisma.resident.findUnique({
-      where: { userId: user.id },
-      select: { complexId: true, status: true },
-    });
-    if (resident && resident.status === 'ACTIVE') {
-      complexId = resident.complexId;
-    }
-  } else if (user.role === 'ADMIN') {
-    const complex = await prisma.residentialComplex.findFirst({
-      where: { adminId: user.id, isActive: true },
-      select: { id: true },
-    });
-    complexId = complex?.id;
-  }
-
   res.json({
     message: 'Login exitoso',
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      avatarUrl: user.avatarUrl,
-      complexId,
-    },
+    user: await buildUserPayload(user),
     ...tokens,
   });
 }));
@@ -257,29 +275,7 @@ router.get('/me', authMiddleware, asyncHandler(async (req: AuthRequest, res) => 
     throw new AppError(404, 'Usuario no encontrado');
   }
 
-  let complexId: string | undefined;
-  let residentStatus: string | undefined;
-  let unit: { id: string; number: string; block?: string | null } | undefined;
-
-  if (user.role === 'RESIDENT' || user.role === 'SECURITY' || user.role === 'COMMITTEE') {
-    const resident = await prisma.resident.findUnique({
-      where: { userId: user.id },
-      select: { complexId: true, status: true, unit: { select: { id: true, number: true, block: true } } },
-    });
-    if (resident) {
-      complexId = resident.complexId;
-      residentStatus = resident.status;
-      unit = resident.unit;
-    }
-  } else if (user.role === 'ADMIN') {
-    const complex = await prisma.residentialComplex.findFirst({
-      where: { adminId: user.id, isActive: true },
-      select: { id: true },
-    });
-    complexId = complex?.id;
-  }
-
-  res.json({ user: { ...user, complexId, residentStatus, unit } });
+  res.json({ user: await buildUserPayload(user) });
 }));
 
 export default router;

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/providers/api_providers.dart';
 import '../../../../core/models/access.dart';
@@ -37,7 +36,6 @@ class _VisitorManagementScreenState extends ConsumerState<VisitorManagementScree
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final state = ref.watch(myVisitorsProvider);
 
     return Scaffold(
@@ -68,7 +66,7 @@ class _VisitorManagementScreenState extends ConsumerState<VisitorManagementScree
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: state.visitors.length,
-                          itemBuilder: (context, index) => _VisitorCard(visitor: state.visitors[index]),
+                          itemBuilder: (context, index) => _VisitorCard(visitor: state.visitors[index], onChanged: _loadVisitors),
                         ),
             ),
           ),
@@ -90,13 +88,14 @@ class _VisitorManagementScreenState extends ConsumerState<VisitorManagementScree
   }
 }
 
-class _VisitorCard extends StatelessWidget {
+class _VisitorCard extends ConsumerWidget {
   final Visitor visitor;
+  final VoidCallback onChanged;
 
-  const _VisitorCard({required this.visitor});
+  const _VisitorCard({required this.visitor, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
     return Card(
@@ -146,9 +145,13 @@ class _VisitorCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton.icon(onPressed: () => _editVisitor(visitor), icon: const Icon(Icons.edit, size: 18), label: const Text('Editar')),
+                if (visitor.entryCode != null) ...[
+                  TextButton.icon(onPressed: () => showVisitorTokenDialog(context, visitor), icon: const Icon(Icons.qr_code_2, size: 18), label: const Text('Token')),
+                  const SizedBox(width: 8),
+                ],
+                TextButton.icon(onPressed: () => _editVisitor(context), icon: const Icon(Icons.edit, size: 18), label: const Text('Editar')),
                 const SizedBox(width: 8),
-                TextButton.icon(onPressed: () => _deleteVisitor(visitor.id), icon: const Icon(Icons.delete, size: 18), label: const Text('Eliminar'), style: TextButton.styleFrom(foregroundColor: Colors.red)),
+                TextButton.icon(onPressed: () => _deleteVisitor(context, ref, visitor.id), icon: const Icon(Icons.delete, size: 18), label: const Text('Eliminar'), style: TextButton.styleFrom(foregroundColor: Colors.red)),
               ],
             ),
           ],
@@ -157,8 +160,21 @@ class _VisitorCard extends StatelessWidget {
     );
   }
 
-  void _editVisitor(Visitor visitor) {}
-  void _deleteVisitor(String id) {}
+  void _editVisitor(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Edición de visitantes próximamente')));
+  }
+
+  Future<void> _deleteVisitor(BuildContext context, WidgetRef ref, String id) async {
+    try {
+      await ref.read(visitorApiProvider).deleteVisitor(id);
+      onChanged();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Visitante eliminado')));
+      }
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
 }
 
 class _AddVisitorDialog extends ConsumerStatefulWidget {

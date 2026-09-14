@@ -240,6 +240,7 @@ model Visitor {
   recurringDays   Int[]    // 0=Sun, 6=Sat
   recurringStart  DateTime?
   recurringEnd    DateTime?
+  entryCode       String?  @unique
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

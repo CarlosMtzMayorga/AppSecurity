@@ -77,6 +77,7 @@ class Visitor extends Equatable {
   final List<int> recurringDays;
   final DateTime? recurringStart;
   final DateTime? recurringEnd;
+  final String? entryCode;
   final String? notes;
   final List<AccessLog> accesses;
 
@@ -93,6 +94,7 @@ class Visitor extends Equatable {
     this.recurringDays = const [],
     this.recurringStart,
     this.recurringEnd,
+    this.entryCode,
     this.notes,
     this.accesses = const [],
   });
@@ -112,6 +114,7 @@ class Visitor extends Equatable {
     recurringDays: List<int>.from(json['recurringDays'] ?? []),
     recurringStart: json['recurringStart'] != null ? DateTime.parse(json['recurringStart']) : null,
     recurringEnd: json['recurringEnd'] != null ? DateTime.parse(json['recurringEnd']) : null,
+    entryCode: json['entryCode'],
     notes: json['notes'],
     accesses: (json['accesses'] as List?)?.map((a) => AccessLog.fromJson(a)).toList() ?? [],
   );

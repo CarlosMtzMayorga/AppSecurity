@@ -160,6 +160,36 @@ router.post('/resident-exit', asyncHandler(async (req: AuthRequest, res) => {
   res.json(updated);
 }));
 
+router.post('/peatonal', asyncHandler(async (req: AuthRequest, res) => {
+  if (req.user!.role !== 'RESIDENT') throw new AppError(403, 'Solo residentes');
+
+  const resident = await prisma.resident.findUnique({ where: { userId: req.user!.id } });
+  if (!resident) throw new AppError(404, 'Perfil de residente no encontrado');
+
+  const log = await prisma.accessLog.create({
+    data: {
+      complexId: req.user!.complexId!,
+      unitId: resident.unitId,
+      residentId: resident.id,
+      type: 'RESIDENT',
+      status: 'APPROVED',
+      entryTime: new Date(),
+      entryMethod: 'PEATONAL',
+    },
+  });
+
+  res.status(201).json(log);
+}));
+
+router.post('/botonera', asyncHandler(async (req: AuthRequest, res) => {
+  if (req.user!.role !== 'RESIDENT') throw new AppError(403, 'Solo residentes');
+
+  const resident = await prisma.resident.findUnique({ where: { userId: req.user!.id } });
+  if (!resident) throw new AppError(404, 'Perfil de residente no encontrado');
+
+  res.json({ ok: true, message: 'Botonera activada' });
+}));
+
 router.patch('/:id/approve', asyncHandler(async (req: AuthRequest, res) => {
   if (!['ADMIN', 'SECURITY', 'COMMITTEE'].includes(req.user!.role)) throw new AppError(403, 'Sin permisos');
   

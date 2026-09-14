@@ -1,307 +1,148 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
-import '../../../../core/providers/api_providers.dart';
-import '../../../../core/providers/app_providers.dart';
-import '../../../../core/models/access.dart';
-import '../../../../core/models/dashboard.dart';
 import '../../../../core/models/user.dart';
-import '../../../../shared/widgets/custom_button.dart';
+import '../../../../core/providers/app_providers.dart';
 
-class DashboardScreen extends ConsumerStatefulWidget {
+class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
   @override
-  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final user = ref.watch(authStateProvider).user;
+    final isResident = user?.role == UserRole.resident;
+
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          children: [
+            _Header(user: user),
+            const SizedBox(height: 24),
+            _MenuTile(
+              icon: Icons.sensors,
+              title: 'Accesos',
+              subtitle: 'Portones, botonera y acceso peatonal',
+              onTap: () => context.push('/access'),
+            ),
+            _MenuTile(
+              icon: Icons.campaign,
+              title: 'Panel de Avisos',
+              subtitle: 'Avisos y comunicados de la administración',
+              onTap: () => context.push('/notices'),
+            ),
+            _MenuTile(
+              icon: Icons.payments,
+              title: 'Pago',
+              subtitle: 'Ver desglose y realizar pagos',
+              onTap: () => context.push('/payments'),
+            ),
+            _MenuTile(
+              icon: Icons.history,
+              title: 'Bitácora',
+              subtitle: 'Reporte de accesos de la comunidad',
+              onTap: () => context.push('/access'),
+            ),
+            _MenuTile(
+              icon: Icons.group_add,
+              title: 'Delegar',
+              subtitle: 'Tokens y accesos para familia y visitas',
+              onTap: () => context.push('/visitors'),
+            ),
+            if (!isResident) ...[
+              const SizedBox(height: 8),
+              Text('Administración', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.primary)),
+              const SizedBox(height: 8),
+              _MenuTile(icon: Icons.people, title: 'Residentes', subtitle: 'Administrar residentes y unidades', onTap: () => context.push('/residents')),
+              _MenuTile(icon: Icons.event_seat, title: 'Reservas', subtitle: 'Reservaciones de amenidades', onTap: () => context.push('/bookings')),
+              _MenuTile(icon: Icons.build, title: 'Servicios', subtitle: 'Solicitudes e incidencias', onTap: () => context.push('/services')),
+              _MenuTile(icon: Icons.account_balance, title: 'Contabilidad', subtitle: 'Finanzas de la colonia', onTap: () => context.push('/accounting')),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
-  }
+class _Header extends StatelessWidget {
+  final User? user;
 
-  Future<void> _loadData() async {
-    await ref.read(dashboardProvider.notifier).loadOverview();
-  }
+  const _Header({this.user});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final authState = ref.watch(authStateProvider);
-    final dashboardState = ref.watch(dashboardProvider);
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Panel de Control'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
-          IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () => context.push('/notices')),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: dashboardState.isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildWelcomeCard(authState.user),
-                    const SizedBox(height: 24),
-                    _buildStatsGrid(dashboardState.overview),
-                    const SizedBox(height: 24),
-                    _buildQuickActions(),
-                    const SizedBox(height: 24),
-                    _buildRecentActivity(dashboardState.recentActivity),
-                  ],
-                ),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildWelcomeCard(User? user) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Text(
-                user?.firstName.isNotEmpty == true ? user!.firstName[0].toUpperCase() : 'U',
-                style: theme.textTheme.headlineMedium?.copyWith(color: theme.colorScheme.primary),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '¡Hola, ${user?.firstName ?? 'Usuario'}!',
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    user?.unit != null ? 'Unidad ${user!.unit!.displayNumber}' : 'Sin unidad asignada',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-            CustomButton(text: 'Mi Acceso', icon: Icons.directions_walk, onPressed: () => context.push('/access')),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsGrid(DashboardOverview? overview) {
-    final theme = Theme.of(context);
-    if (overview == null) return const SizedBox();
-
-    final stats = [
-      ('Residentes', '${overview.residents.active}/${overview.residents.total}', Icons.people, theme.colorScheme.primary),
-      ('Unidades', '${overview.units.occupied}/${overview.units.total}', Icons.home, theme.colorScheme.secondary),
-      ('Pagos Pendientes', '${overview.payments.pending}', Icons.payments, theme.colorScheme.tertiary),
-      ('Servicios Abiertos', '${overview.services.open}', Icons.build, Colors.orange),
-      ('Accesos Activos', '${overview.activeAccesses}', Icons.security, Colors.purple),
-      ('Balance', '\$${overview.finances.balance.toStringAsFixed(0)}', Icons.account_balance, overview.finances.balance >= 0 ? Colors.green : Colors.red),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.4,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: stats.length,
-      itemBuilder: (context, index) {
-        final (title, value, icon, color) = stats[index];
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                      child: Icon(icon, color: color, size: 24),
-                    ),
-                    const Spacer(),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(value, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
-                Text(title, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              ],
-            ),
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 24,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: Text(
+            user?.firstName.isNotEmpty == true ? user!.firstName[0].toUpperCase() : 'A',
+            style: theme.textTheme.headlineSmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildQuickActions() {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Accesos Rápidos', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _QuickActionCard(icon: Icons.directions_walk, label: 'Entrada/Salida', color: Colors.blue, onTap: () => context.push('/access')),
-            _QuickActionCard(icon: Icons.person_add, label: 'Registrar Visitante', color: Colors.green, onTap: () => context.push('/visitors')),
-            _QuickActionCard(icon: Icons.payment, label: 'Ver Pagos', color: Colors.orange, onTap: () => context.push('/payments')),
-            _QuickActionCard(icon: Icons.event_seat, label: 'Reservar Amenidad', color: Colors.purple, onTap: () => context.push('/bookings')),
-            _QuickActionCard(icon: Icons.build, label: 'Reportar Incidencia', color: Colors.red, onTap: () => context.push('/services')),
-            _QuickActionCard(icon: Icons.announcement, label: 'Ver Avisos', color: Colors.teal, onTap: () => context.push('/notices')),
-          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('¡Hola, ${user?.firstName ?? 'Usuario'}!', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                user?.email ?? '',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Tokens',
+          icon: const Icon(Icons.qr_code_2),
+          onPressed: () => context.push('/visitors'),
+        ),
+        const SizedBox(width: 4),
+        IconButton(
+          tooltip: 'Preferencias',
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: () => context.push('/settings'),
         ),
       ],
     );
-  }
-
-  Widget _buildRecentActivity(RecentActivity? activity) {
-    final theme = Theme.of(context);
-    if (activity == null) return const SizedBox();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Actividad Reciente', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-            TextButton(onPressed: () {}, child: const Text('Ver todo')),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (activity.recentAccesses.isNotEmpty) ...[
-          Text('Accesos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          ...activity.recentAccesses.take(3).map((a) => _ActivityTile(
-            icon: a.type == AccessType.resident ? Icons.person : Icons.person_add,
-            title: a.displayName,
-            subtitle: '${a.unitDisplay} • ${_formatTime(a.entryTime)}',
-            status: _getStatusColor(a.status),
-          )),
-        ],
-      ],
-    );
-  }
-
-  Widget _ActivityTile({required IconData icon, required String title, required String subtitle, required Color status}) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(backgroundColor: status.withOpacity(0.1), child: Icon(icon, color: status, size: 20)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-        subtitle: Text(subtitle),
-        trailing: Container(width: 10, height: 10, decoration: BoxDecoration(color: status, shape: BoxShape.circle)),
-      ),
-    );
-  }
-
-  String _formatTime(DateTime? time) {
-    if (time == null) return 'Sin hora';
-    return DateFormat('HH:mm').format(time);
-  }
-
-  Color _getStatusColor(AccessStatus status) {
-    switch (status) {
-      case AccessStatus.approved: return Colors.green;
-      case AccessStatus.pending: return Colors.orange;
-      case AccessStatus.rejected: return Colors.red;
-      case AccessStatus.completed: return Colors.blue;
-      default: return Colors.grey;
-    }
   }
 }
 
-class _QuickActionCard extends StatelessWidget {
+class _MenuTile extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final Color color;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
-  const _QuickActionCard({required this.icon, required this.label, required this.color, required this.onTap});
+  const _MenuTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 140,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: theme.colorScheme.primary),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: Colors.white, size: 28),
-            ),
-            const SizedBox(height: 12),
-            Text(label, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w500, color: color)),
-          ],
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
-  }
-}
-
-final dashboardProvider = StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
-  return DashboardNotifier(ref.read(dashboardApiProvider));
-});
-
-class DashboardState {
-  final bool isLoading;
-  final DashboardOverview? overview;
-  final RecentActivity? recentActivity;
-  final String? error;
-
-  const DashboardState({this.isLoading = false, this.overview, this.recentActivity, this.error});
-  
-  DashboardState copyWith({bool? isLoading, DashboardOverview? overview, RecentActivity? recentActivity, String? error}) =>
-      DashboardState(isLoading: isLoading ?? this.isLoading, overview: overview ?? this.overview, recentActivity: recentActivity ?? this.recentActivity, error: error ?? this.error);
-}
-
-class DashboardNotifier extends StateNotifier<DashboardState> {
-  final DashboardApi _api;
-  
-  DashboardNotifier(this._api) : super(const DashboardState());
-
-  Future<void> loadOverview() async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      final overview = await _api.getOverview();
-      final activity = await _api.getRecentActivity();
-      state = state.copyWith(isLoading: false, overview: overview, recentActivity: activity);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
   }
 }

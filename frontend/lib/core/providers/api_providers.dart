@@ -173,6 +173,15 @@ class AccessApi extends BaseApi {
     return AccessLog.fromJson(response.data);
   }
 
+  Future<AccessLog> peatonalEntry() async {
+    final response = await dio.post('/access/peatonal');
+    return AccessLog.fromJson(response.data);
+  }
+
+  Future<void> openBotonera() async {
+    await dio.post('/access/botonera');
+  }
+
   Future<AccessLog> approveAccess(String id, {required String status, String? notes}) async {
     final response = await dio.patch('/access/$id/approve', data: {'status': status, 'notes': notes});
     return AccessLog.fromJson(response.data);
