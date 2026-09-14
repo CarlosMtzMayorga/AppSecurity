@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/providers/api_providers.dart';
 import '../../../../core/models/access.dart';
 import '../../../../core/models/resident.dart';
+import '../../../../shared/widgets/custom_text_field.dart';
 
 class ResidentDetailScreen extends ConsumerStatefulWidget {
   final String residentId;
@@ -178,12 +179,25 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
     );
   }
 
-  void _generateQr(Resident resident) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generando QR...')));
+  Future<void> _generateQr(Resident resident) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(residentApiProvider).generateQrCode(resident.id);
+      messenger.showSnackBar(const SnackBar(content: Text('QR generado')));
+      await ref.read(residentDetailProvider(widget.residentId).notifier).load();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
-  void _showEditDialog(Resident resident) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Edición en desarrollo')));
+  Future<void> _showEditDialog(Resident resident) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (context) => _EditResidentDialog(resident: resident),
+    );
+    if (updated == true) {
+      await ref.read(residentDetailProvider(widget.residentId).notifier).load();
+    }
   }
 
   String _formatDateTime(DateTime? dt) => dt != null ? DateFormat('dd/MM/yyyy HH:mm').format(dt) : 'Sin fecha';
@@ -221,6 +235,135 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
 final residentDetailProvider = StateNotifierProvider.family<ResidentDetailNotifier, ResidentDetailState, String>((ref, id) {
   return ResidentDetailNotifier(ref.read(residentApiProvider), id);
 });
+
+class _EditResidentDialog extends ConsumerStatefulWidget {
+  final Resident resident;
+  const _EditResidentDialog({required this.resident});
+
+  @override
+  ConsumerState<_EditResidentDialog> createState() => _EditResidentDialogState();
+}
+
+class _EditResidentDialogState extends ConsumerState<_EditResidentDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _firstNameController = TextEditingController(text: widget.resident.user.firstName);
+  late final _lastNameController = TextEditingController(text: widget.resident.user.lastName);
+  late final _phoneController = TextEditingController(text: widget.resident.user.phone ?? '');
+  late final _rutController = TextEditingController(text: widget.resident.rut ?? '');
+  late final _emergencyNameController = TextEditingController(text: widget.resident.emergencyContactName ?? '');
+  late final _emergencyPhoneController = TextEditingController(text: widget.resident.emergencyContactPhone ?? '');
+  late final _emergencyRelationController = TextEditingController(text: widget.resident.emergencyContactRelation ?? '');
+  late final _vehiclePlatesController = TextEditingController(text: widget.resident.vehiclePlates.join(', '));
+  late ResidentStatus _status = widget.resident.status;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _phoneController.dispose();
+    _rutController.dispose();
+    _emergencyNameController.dispose();
+    _emergencyPhoneController.dispose();
+    _emergencyRelationController.dispose();
+    _vehiclePlatesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final plates = _vehiclePlatesController.text
+        .split(',')
+        .map((p) => p.trim().toUpperCase())
+        .where((p) => p.isNotEmpty && p != widget.resident.vehiclePlates.join(', '))
+        .toList();
+    setState(() => _submitting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(residentApiProvider).updateResident(widget.resident.id, {
+        'firstName': _firstNameController.text.trim(),
+        'lastName': _lastNameController.text.trim(),
+        'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        'rut': _rutController.text.trim().isEmpty ? null : _rutController.text.trim(),
+        'emergencyContactName': _emergencyNameController.text.trim().isEmpty ? null : _emergencyNameController.text.trim(),
+        'emergencyContactPhone': _emergencyPhoneController.text.trim().isEmpty ? null : _emergencyPhoneController.text.trim(),
+        'emergencyContactRelation': _emergencyRelationController.text.trim().isEmpty ? null : _emergencyRelationController.text.trim(),
+        'vehiclePlates': plates,
+        'status': _status.name.toUpperCase(),
+      });
+      if (mounted) {
+        Navigator.pop(context, true);
+        messenger.showSnackBar(const SnackBar(content: Text('Residente actualizado'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Editar ${widget.resident.user.fullName}'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                Expanded(child: CustomTextField(controller: _firstNameController, label: 'Nombre *', prefixIcon: Icons.person,
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null)),
+                const SizedBox(width: 12),
+                Expanded(child: CustomTextField(controller: _lastNameController, label: 'Apellido *', validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null)),
+              ]),
+              const SizedBox(height: 12),
+              CustomTextField(controller: _phoneController, label: 'Teléfono', prefixIcon: Icons.phone, keyboardType: TextInputType.phone),
+              const SizedBox(height: 12),
+              CustomTextField(controller: _rutController, label: 'RUT/RFC', prefixIcon: Icons.badge),
+              const SizedBox(height: 12),
+              CustomTextField(controller: _vehiclePlatesController, label: 'Placas (separadas por coma)', prefixIcon: Icons.directions_car),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<ResidentStatus>(
+                initialValue: _status,
+                decoration: const InputDecoration(labelText: 'Estado', border: OutlineInputBorder()),
+                items: ResidentStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(_statusLabel(s)))).toList(),
+                onChanged: (v) => setState(() => _status = v ?? _status),
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              CustomTextField(controller: _emergencyNameController, label: 'Contacto de emergencia (nombre)', prefixIcon: Icons.person_outline),
+              const SizedBox(height: 12),
+              CustomTextField(controller: _emergencyPhoneController, label: 'Contacto de emergencia (tel)', prefixIcon: Icons.phone_outlined, keyboardType: TextInputType.phone),
+              const SizedBox(height: 12),
+              CustomTextField(controller: _emergencyRelationController, label: 'Relación', prefixIcon: Icons.family_restroom),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Guardar'),
+        ),
+      ],
+    );
+  }
+
+  String _statusLabel(ResidentStatus s) {
+    switch (s) {
+      case ResidentStatus.active: return 'Activo';
+      case ResidentStatus.pending: return 'Pendiente';
+      case ResidentStatus.inactive: return 'Inactivo';
+      case ResidentStatus.suspended: return 'Suspendido';
+    }
+  }
+}
 
 class ResidentDetailState {
   final Resident? resident;

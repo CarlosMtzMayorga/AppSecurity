@@ -7,6 +7,8 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/models/accounting.dart';
 import '../../../../core/models/dashboard.dart';
 import '../../../../core/models/user.dart';
+import '../../../../core/utils/csv_download.dart';
+import '../../../../shared/widgets/custom_text_field.dart';
 
 class AccountingScreen extends ConsumerStatefulWidget {
   const AccountingScreen({super.key});
@@ -80,12 +82,204 @@ class _AccountingScreenState extends ConsumerState<AccountingScreen> with Single
     );
   }
 
-  void _showCreateEntry() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Crear movimiento en desarrollo')));
+  Future<void> _showCreateEntry() async {
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (context) => const _CreateEntryDialog(),
+    );
+    if (created == true) {
+      ref.read(accountingSummaryProvider.notifier).load();
+      ref.read(accountingEntriesProvider.notifier).load();
+    }
   }
 
-  void _exportReport() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exportar reporte en desarrollo')));
+  Future<void> _exportReport() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final entries = ref.read(accountingEntriesProvider).entries;
+    if (entries.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('No hay movimientos para exportar')));
+      return;
+    }
+    try {
+      final buffer = StringBuffer('Fecha,Tipo,Categoría,Subcategoría,Descripción,Referencia,Monto,Moneda\n');
+      for (final e in entries) {
+        buffer.writeln([
+          DateFormat('yyyy-MM-dd').format(e.date),
+          e.typeLabel,
+          e.category,
+          e.subcategory ?? '',
+          '"${e.description.replaceAll('"', '""')}"',
+          e.reference ?? '',
+          e.amount.toStringAsFixed(2),
+          e.currency,
+        ].join(','));
+      }
+      final encodedCSV = buffer.toString();
+      downloadCsv('reporte-${DateFormat('yyyyMMdd').format(DateTime.now())}.csv', encodedCSV);
+      messenger.showSnackBar(const SnackBar(content: Text('Reporte exportado'), backgroundColor: Colors.green));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+}
+
+class _CreateEntryDialog extends ConsumerStatefulWidget {
+  const _CreateEntryDialog();
+
+  @override
+  ConsumerState<_CreateEntryDialog> createState() => _CreateEntryDialogState();
+}
+
+class _CreateEntryDialogState extends ConsumerState<_CreateEntryDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _subcategoryController = TextEditingController();
+  final _referenceController = TextEditingController();
+  AccountingType _type = AccountingType.expense;
+  String? _category;
+  DateTime _date = DateTime.now();
+  bool _submitting = false;
+
+  static const _incomeCategories = ['Cuotas de mantenimiento', 'Cuotas extraordinarias', 'Amenidades', 'Multas', 'Rendimientos', 'Otros ingresos'];
+  static const _expenseCategories = ['Mantenimiento', 'Servicios', 'Personal', 'Seguridad', 'Limpieza', 'Suministros', 'Otros gastos'];
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _descriptionController.dispose();
+    _subcategoryController.dispose();
+    _referenceController.dispose();
+    super.dispose();
+  }
+
+  List<String> get _categories => _type == AccountingType.income ? _incomeCategories : _expenseCategories;
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(DateTime.now().year - 2),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_category == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona una categoría')));
+      return;
+    }
+    final amount = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Monto inválido')));
+      return;
+    }
+    setState(() => _submitting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(accountingApiProvider).createEntry({
+        'type': _type.name.toUpperCase(),
+        'category': _category!,
+        'subcategory': _subcategoryController.text.trim().isEmpty ? null : _subcategoryController.text.trim(),
+        'amount': amount,
+        'description': _descriptionController.text.trim(),
+        'reference': _referenceController.text.trim().isEmpty ? null : _referenceController.text.trim(),
+        'date': _date.toUtc().toIso8601String(),
+      });
+      if (mounted) {
+        Navigator.pop(context, true);
+        messenger.showSnackBar(const SnackBar(content: Text('Movimiento registrado'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nuevo Movimiento'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SegmentedButton<AccountingType>(
+                segments: const [
+                  ButtonSegment(value: AccountingType.expense, label: Text('Gasto'), icon: Icon(Icons.trending_down)),
+                  ButtonSegment(value: AccountingType.income, label: Text('Ingreso'), icon: Icon(Icons.trending_up)),
+                ],
+                selected: {_type},
+                onSelectionChanged: (s) => setState(() {
+                  _type = s.first;
+                  _category = null;
+                }),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _category,
+                decoration: const InputDecoration(labelText: 'Categoría *', border: OutlineInputBorder()),
+                items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                onChanged: (v) => setState(() => _category = v),
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _amountController,
+                label: 'Monto (MXN) *',
+                hint: 'Ej: 500.00',
+                prefixIcon: Icons.attach_money,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) => v == null || v.trim().isEmpty ? 'El monto es requerido' : null,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _descriptionController,
+                label: 'Descripción *',
+                hint: 'Detalle del movimiento',
+                prefixIcon: Icons.receipt_long,
+                validator: (v) => v == null || v.trim().isEmpty ? 'La descripción es requerida' : null,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _subcategoryController,
+                label: 'Subcategoría (opcional)',
+                prefixIcon: Icons.sell_outlined,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _referenceController,
+                label: 'Referencia (opcional)',
+                hint: 'Folio, factura, recibo…',
+                prefixIcon: Icons.tag,
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_month),
+                title: Text('Fecha: ${DateFormat('dd/MM/yyyy').format(_date)}'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _pickDate,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Guardar'),
+        ),
+      ],
+    );
   }
 }
 

@@ -71,6 +71,7 @@ dependencies:
   equatable: ^2.0.5
   uuid: ^4.2.2
   jwt_decoder: ^2.0.1
+  web: ^1.0.0
 
 dev_dependencies:
   flutter_test:

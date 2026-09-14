@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/providers/api_providers.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/models/payment.dart';
+import '../../../../core/models/resident.dart';
 import '../../../../core/models/user.dart';
 import '../../../../shared/widgets/custom_text_field.dart';
 
@@ -80,8 +81,15 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> with SingleTick
     ));
   }
 
-  void _showCreatePayment() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Crear pago en desarrollo')));
+  Future<void> _showCreatePayment() async {
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (context) => const _CreatePaymentDialog(),
+    );
+    if (created == true) {
+      ref.read(paymentsProvider.notifier).loadPayments();
+      ref.read(myPaymentsProvider.notifier).load();
+    }
   }
 
   String _getStatusLabel(String s) {
@@ -92,6 +100,187 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> with SingleTick
       case 'OVERDUE': return 'Vencidos';
       case 'FAILED': return 'Fallidos';
       default: return s;
+    }
+  }
+}
+
+class _CreatePaymentDialog extends ConsumerStatefulWidget {
+  const _CreatePaymentDialog();
+
+  @override
+  ConsumerState<_CreatePaymentDialog> createState() => _CreatePaymentDialogState();
+}
+
+class _CreatePaymentDialogState extends ConsumerState<_CreatePaymentDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _notesController = TextEditingController();
+  List<Resident> _residents = [];
+  bool _loadingResidents = true;
+  Resident? _selectedResident;
+  PaymentType _type = PaymentType.maintenance;
+  DateTime _dueDate = DateTime.now().add(const Duration(days: 30));
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadResidents();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _descriptionController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadResidents() async {
+    setState(() => _loadingResidents = true);
+    try {
+      final response = await ref.read(residentApiProvider).getResidents(limit: 100, status: 'ACTIVE');
+      if (mounted) {
+        setState(() {
+          _residents = response.data;
+          _loadingResidents = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingResidents = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> _pickDueDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _dueDate = picked);
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedResident == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona un residente')));
+      return;
+    }
+    final amount = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Monto inválido')));
+      return;
+    }
+    setState(() => _submitting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(paymentApiProvider).createPayment({
+        'residentId': _selectedResident!.id,
+        'type': _type.name.toUpperCase(),
+        'amount': amount,
+        'description': _descriptionController.text.trim(),
+        'dueDate': _dueDate.toUtc().toIso8601String(),
+        'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      });
+      if (mounted) {
+        Navigator.pop(context, true);
+        messenger.showSnackBar(const SnackBar(content: Text('Pago creado'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Crear Pago'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_loadingResidents)
+                const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+              else
+                DropdownButtonFormField<Resident>(
+                  initialValue: _selectedResident,
+                  decoration: const InputDecoration(labelText: 'Residente *', border: OutlineInputBorder()),
+                  items: _residents.map((r) => DropdownMenuItem(
+                    value: r,
+                    child: Text('${r.user.fullName} — ${r.unit.displayNumber}'),
+                  )).toList(),
+                  onChanged: (v) => setState(() => _selectedResident = v),
+                ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _amountController,
+                label: 'Monto (MXN)',
+                hint: 'Ej: 2500.00',
+                prefixIcon: Icons.attach_money,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) => v == null || v.trim().isEmpty ? 'El monto es requerido' : null,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _descriptionController,
+                label: 'Descripción',
+                hint: 'Ej: Cuota de mantenimiento septiembre',
+                prefixIcon: Icons.receipt,
+                validator: (v) => v == null || v.trim().isEmpty ? 'La descripción es requerida' : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<PaymentType>(
+                initialValue: _type,
+                decoration: const InputDecoration(labelText: 'Tipo', border: OutlineInputBorder()),
+                items: PaymentType.values.map((t) => DropdownMenuItem(value: t, child: Text(_typeLabel(t)))).toList(),
+                onChanged: (v) => setState(() => _type = v ?? PaymentType.maintenance),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event),
+                title: Text('Vence: ${DateFormat('dd/MM/yyyy').format(_dueDate)}'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _pickDueDate,
+              ),
+              CustomTextField(
+                controller: _notesController,
+                label: 'Notas (opcional)',
+                prefixIcon: Icons.note,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Crear Pago'),
+        ),
+      ],
+    );
+  }
+
+  String _typeLabel(PaymentType t) {
+    switch (t) {
+      case PaymentType.maintenance: return 'Mantenimiento';
+      case PaymentType.extraordinary: return 'Extraordinario';
+      case PaymentType.amenity: return 'Amenidad';
+      case PaymentType.penalty: return 'Multa';
+      case PaymentType.other: return 'Otro';
     }
   }
 }

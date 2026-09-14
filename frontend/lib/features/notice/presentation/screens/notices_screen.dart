@@ -86,7 +86,152 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen> {
   }
 
   void _showCreateNotice() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Crear aviso en desarrollo')));
+    showDialog<bool>(
+      context: context,
+      builder: (context) => const _CreateNoticeDialog(),
+    ).then((created) {
+      if (created == true) {
+        _loadNotices();
+        ref.invalidate(unreadNoticesProvider);
+      }
+    });
+  }
+}
+
+class _CreateNoticeDialog extends ConsumerStatefulWidget {
+  const _CreateNoticeDialog();
+
+  @override
+  ConsumerState<_CreateNoticeDialog> createState() => _CreateNoticeDialogState();
+}
+
+class _CreateNoticeDialogState extends ConsumerState<_CreateNoticeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _contentController = TextEditingController();
+  NoticeType _type = NoticeType.general;
+  bool _isPinned = false;
+  DateTime? _expiresAt;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nuevo Aviso'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CustomTextField(
+                controller: _titleController,
+                label: 'Título',
+                hint: 'Título del comunicado',
+                prefixIcon: Icons.title,
+                validator: (v) => v == null || v.trim().isEmpty ? 'El título es requerido' : null,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _contentController,
+                label: 'Contenido',
+                hint: 'Redacta el aviso…',
+                prefixIcon: Icons.description,
+                maxLines: 5,
+                validator: (v) => v == null || v.trim().isEmpty ? 'El contenido es requerido' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<NoticeType>(
+                initialValue: _type,
+                decoration: const InputDecoration(labelText: 'Tipo', border: OutlineInputBorder()),
+                items: NoticeType.values.map((t) => DropdownMenuItem(value: t, child: Text(_typeLabel(t)))).toList(),
+                onChanged: (v) => setState(() => _type = v ?? NoticeType.general),
+              ),
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                value: _isPinned,
+                onChanged: (v) => setState(() => _isPinned = v ?? false),
+                title: const Text('Fijar aviso'),
+                subtitle: const Text('Mostrar al inicio de la lista'),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_busy),
+                title: Text(_expiresAt == null ? 'Sin fecha de expiración' : 'Expira: ${DateFormat('dd/MM/yyyy').format(_expiresAt!)}'),
+                subtitle: const Text('Opcional'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.calendar_today),
+                  onPressed: () => _pickExpiry(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Publicar'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickExpiry() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _expiresAt ?? DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _expiresAt = picked);
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(noticeApiProvider).createNotice({
+        'title': _titleController.text.trim(),
+        'content': _contentController.text.trim(),
+        'type': _type.name.toUpperCase(),
+        'isPinned': _isPinned,
+        if (_expiresAt != null) 'expiresAt': _expiresAt!.toUtc().toIso8601String(),
+      });
+      if (mounted) {
+        Navigator.pop(context, true);
+        messenger.showSnackBar(const SnackBar(content: Text('Aviso publicado'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  String _typeLabel(NoticeType t) {
+    switch (t) {
+      case NoticeType.general: return 'General';
+      case NoticeType.urgent: return 'Urgente';
+      case NoticeType.maintenance: return 'Mantenimiento';
+      case NoticeType.event: return 'Evento';
+      case NoticeType.security: return 'Seguridad';
+      case NoticeType.financial: return 'Financiero';
+    }
   }
 }
 
