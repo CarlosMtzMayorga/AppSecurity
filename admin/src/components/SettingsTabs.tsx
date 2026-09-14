@@ -16,7 +16,7 @@ function Feedback({ state, pending }: { state: { error?: string; ok?: boolean } 
   return null;
 }
 
-function SubmitRow({ pending, state }: { pending: boolean; state: { error?: string; ok?: boolean } | undefined }) {
+function SubmitRow({ pending }: { pending: boolean }) {
   return (
     <div className="flex justify-end">
       <button type="submit" disabled={pending} className={btnPrimary}>
@@ -54,7 +54,7 @@ function ComplexForm({ complex }: { complex: ResidentialComplex }) {
           <input name="postalCode" defaultValue={complex.postalCode} className={inputCls} />
         </Field>
       </div>
-      <SubmitRow pending={pending} state={state} />
+      <SubmitRow pending={pending} />
     </form>
   );
 }
@@ -97,7 +97,7 @@ function AccessForm({ config }: { config: ResidentialComplex['accessConfig'][num
         <Switch name="faceRecognition" label="Reconocimiento facial" defaultOn={c?.faceRecognition ?? false} />
         <Switch name="plateRecognition" label="Reconocimiento de placas" defaultOn={c?.plateRecognition ?? false} />
       </div>
-      <SubmitRow pending={pending} state={state} />
+      <SubmitRow pending={pending} />
     </form>
   );
 }
@@ -129,7 +129,7 @@ function SettingsForm({ settings }: { settings: ResidentialComplex['settings'] }
         <Switch name="notifyAccessEntry" label="Notificar accesos" defaultOn={s?.notifyAccessEntry ?? false} />
         <Switch name="notifyServiceUpdates" label="Notificar actualizaciones de servicios" defaultOn={s?.notifyServiceUpdates ?? true} />
       </div>
-      <SubmitRow pending={pending} state={state} />
+      <SubmitRow pending={pending} />
     </form>
   );
 }

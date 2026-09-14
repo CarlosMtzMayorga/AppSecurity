@@ -10,18 +10,34 @@ import {
 import { Card, CardHeader, StatCard, Badge, Td, Th } from '@/components/ui';
 import { mxn, fmtDateTime, ACCESS_TYPE, ACCESS_STATUS, PAYMENT_STATUS } from '@/lib/format';
 
-function Bars({ data, valueKey, height = 140 }: { data: any[]; valueKey: string; height?: number }) {
-  const values = data.map((d) => d[valueKey] as number);
+interface ActivityResponse {
+  recentAccesses: AccessLogItem[];
+  recentPayments: PaymentItem[];
+  recentRequests: ServiceRequest[];
+  recentNotices: [];
+}
+
+type BarDatum = { month?: string; date?: string };
+
+interface BarsProps<T> {
+  data: T[];
+  valueKey: keyof T;
+  height?: number;
+}
+
+function Bars<T extends BarDatum>({ data, valueKey, height = 140 }: BarsProps<T>) {
+  const values = data.map((d) => (d[valueKey] as number) ?? 0);
   const max = Math.max(...values, 1);
+  const label = (d: T) => String(d.month ?? d.date).slice(5);
   return (
     <div className="flex items-end gap-2 px-1" style={{ height }}>
       {data.map((d, i) => (
-        <div key={i} className="flex flex-1 flex-col items-center gap-1" title={`${d.month ?? d.date}: ${d[valueKey]}`}>
+        <div key={i} className="flex flex-1 flex-col items-center gap-1" title={`${label(d)}: ${d[valueKey]}`}>
           <div
             className="w-full rounded-t bg-indigo-500"
-            style={{ height: Math.max((d[valueKey] / max) * (height - 36), 2) }}
+            style={{ height: Math.max((((d[valueKey] as number) ?? 0) / max) * (height - 36), 2) }}
           />
-          <span className="text-[10px] text-slate-400">{String(d.month ?? d.date).slice(5)}</span>
+          <span className="text-[10px] text-slate-400">{label(d)}</span>
         </div>
       ))}
     </div>
@@ -33,12 +49,7 @@ export default async function DashboardPage() {
     api<DashboardOverview>('/dashboard/overview'),
     api<PaymentTrend[]>('/dashboard/payment-trends?months=6'),
     api<AccessTrend[]>('/dashboard/access-trends?days=14'),
-    api<{
-      recentAccesses: AccessLogItem[];
-      recentPayments: (PaymentItem & { resident: any })[];
-      recentRequests: ServiceRequest[];
-      recentNotices: any[];
-    }>('/dashboard/recent-activity'),
+    api<ActivityResponse>('/dashboard/recent-activity'),
   ]);
 
   return (

@@ -17,9 +17,9 @@ export default async function ResidentDetailPage({ params }: PageProps<'/residen
     throw e;
   }
 
-  const payments = (resident as any).payments ?? [];
-  const accesses = (resident as any).accesses ?? [];
-  const visitors = (resident as any).visitors ?? [];
+  const payments = resident.payments ?? [];
+  const accesses = resident.accesses ?? [];
+  const visitors = resident.visitors ?? [];
 
   return (
     <div className="space-y-6">
@@ -74,7 +74,7 @@ export default async function ResidentDetailPage({ params }: PageProps<'/residen
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {accesses.slice(0, 6).map((a: any) => (
+                {accesses.slice(0, 6).map((a) => (
                   <tr key={a.id}>
                     <Td>{fmtDateTime(a.entryTime ?? a.createdAt)}</Td>
                     <Td>{ACCESS_TYPE[a.type] ?? a.type}</Td>
@@ -104,7 +104,7 @@ export default async function ResidentDetailPage({ params }: PageProps<'/residen
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {payments.slice(0, 5).map((p: any) => (
+                {payments.slice(0, 5).map((p) => (
                   <tr key={p.id}>
                     <Td>{p.description}</Td>
                     <Td>{mxn(p.amount)}</Td>
@@ -133,7 +133,7 @@ export default async function ResidentDetailPage({ params }: PageProps<'/residen
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {visitors.map((v: any) => (
+              {visitors.map((v) => (
                 <tr key={v.id}>
                   <Td>{v.firstName} {v.lastName}</Td>
                   <Td>{v.phone ?? '—'}</Td>

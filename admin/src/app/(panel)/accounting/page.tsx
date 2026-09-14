@@ -1,7 +1,7 @@
 import { api } from '@/lib/api';
 import { Paginated, AccountingEntry, AccountingSummary, AccountingMonthly } from '@/lib/types';
 import { Card, PageHeader, Pagination, StatCard, EmptyState, Th, Td, inputCls, btnSecondary, CardHeader } from '@/components/ui';
-import { mxn, fmtDate, fmtDateTime } from '@/lib/format';
+import { mxn, fmtDate } from '@/lib/format';
 import AccountingEntryDialog from '@/components/AccountingEntryDialog';
 import { AccountingEntryActions } from '@/components/AccountingEntryActions';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { approveResident, setResidentStatus, deactivateResident } from '@/app/actions/residents';
 import { btnPrimary, btnSecondary, btnDanger } from '@/components/ui';
@@ -9,7 +9,7 @@ export function ResidentActions({ id, status }: { id: string; status: string }) 
   const router = useRouter();
   const [pending, start] = useTransition();
 
-  const run = (fn: () => Promise<void>) => startTransition(async () => {
+  const run = (fn: () => Promise<void>) => start(async () => {
     await fn();
     router.refresh();
   });

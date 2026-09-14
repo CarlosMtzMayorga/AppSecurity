@@ -75,6 +75,36 @@ export interface ResidentDetail extends ResidentListItem {
     monthlyFee: number;
   };
   user: UserRef & { createdAt: string };
+  payments: ResidentPayment[];
+  accesses: ResidentAccess[];
+  visitors: ResidentVisitor[];
+}
+
+export interface ResidentPayment {
+  id: string;
+  type: PaymentType;
+  status: PaymentStatus;
+  amount: number;
+  description: string;
+  dueDate: string;
+}
+
+export interface ResidentAccess {
+  id: string;
+  type: AccessType;
+  status: AccessStatus;
+  entryTime: string | null;
+  createdAt: string;
+  entryMethod: string | null;
+}
+
+export interface ResidentVisitor {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  vehiclePlate: string | null;
+  isRecurring: boolean;
 }
 
 export interface UnitListItem {
