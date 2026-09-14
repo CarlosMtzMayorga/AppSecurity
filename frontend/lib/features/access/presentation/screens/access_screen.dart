@@ -95,40 +95,69 @@ class _GateControlTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       children: [
-        Row(children: [
-          Icon(Icons.info_outline, size: 18, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text('Mantén presionado el botón durante 2 segundos para abrir',
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(12),
           ),
-        ]),
-        const SizedBox(height: 28),
-        GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 24,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _GateButton(number: '1', label: 'Entrada', icon: Icons.login, color: const Color(0xFF16A34A),
-              onActivate: () => _gateEntry(context, ref)),
-            _GateButton(number: '2', label: 'Salida', icon: Icons.logout, color: const Color(0xFFDC2626),
-              onActivate: () => _gateExit(context, ref)),
-            _GateButton(number: '3', label: 'Peatonal', icon: Icons.directions_walk, color: const Color(0xFF4F46E5),
-              onActivate: () => _gatePeatonal(context, ref)),
-            _GateButton(number: '4', label: 'Botonera', icon: Icons.doorbell, color: const Color(0xFFEA580C),
-              onActivate: () => _gateBotonera(context, ref)),
-          ],
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Mantén presionado el botón durante 2 segundos para abrir',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 24),
+        _GateButton(
+          label: 'Entrada',
+          subtitle: 'Puerta vehicular principal',
+          icon: Icons.login_rounded,
+          color: const Color(0xFF16A34A),
+          onActivate: () => _gateEntry(context, ref),
+        ),
+        const SizedBox(height: 14),
+        _GateButton(
+          label: 'Salida',
+          subtitle: 'Puerta vehicular de salida',
+          icon: Icons.logout_rounded,
+          color: const Color(0xFFDC2626),
+          onActivate: () => _gateExit(context, ref),
+        ),
+        const SizedBox(height: 14),
+        _GateButton(
+          label: 'Peatonal',
+          subtitle: 'Puerta peatonal',
+          icon: Icons.directions_walk_rounded,
+          color: const Color(0xFF4F46E5),
+          onActivate: () => _gatePeatonal(context, ref),
+        ),
+        const SizedBox(height: 14),
+        _GateButton(
+          label: 'Botonera',
+          subtitle: 'Activa la botonera de la caseta',
+          icon: Icons.doorbell_rounded,
+          color: const Color(0xFFEA580C),
+          onActivate: () => _gateBotonera(context, ref),
+        ),
+        const SizedBox(height: 20),
         Center(
           child: TextButton.icon(
             onPressed: onRefresh,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text('Actualizar accesos'),
           ),
         ),
@@ -171,32 +200,57 @@ class _GateControlTab extends ConsumerWidget {
 }
 
 class _GateButton extends StatefulWidget {
-  final String number;
   final String label;
+  final String subtitle;
   final IconData icon;
   final Color color;
   final Future<void> Function() onActivate;
 
-  const _GateButton({required this.number, required this.label, required this.icon, required this.color, required this.onActivate});
+  const _GateButton({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onActivate,
+  });
 
   @override
   State<_GateButton> createState() => _GateButtonState();
 }
 
-class _GateButtonState extends State<_GateButton> {
+class _GateButtonState extends State<_GateButton> with SingleTickerProviderStateMixin {
   static const _holdMs = 2000;
 
   Timer? _timer;
   final Stopwatch _hold = Stopwatch();
   double _progress = 0;
   bool _loading = false;
+  bool _pressed = false;
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 120),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
+    );
+  }
 
   void _onHoldStart() {
     if (_loading) return;
     _hold
       ..reset()
       ..start();
-    setState(() => _progress = 0);
+    setState(() {
+      _progress = 0;
+      _pressed = true;
+    });
+    _scaleController.forward();
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 40), (t) {
       final p = _hold.elapsedMilliseconds / _holdMs;
@@ -211,13 +265,21 @@ class _GateButtonState extends State<_GateButton> {
   void _onHoldEnd() {
     _hold..stop()..reset();
     _timer?.cancel();
-    if (!_loading && mounted) setState(() => _progress = 0);
+    _scaleController.reverse();
+    if (!_loading && mounted) setState(() {
+      _progress = 0;
+      _pressed = false;
+    });
   }
 
   Future<void> _activate() async {
     _hold..stop()..reset();
     _timer?.cancel();
-    setState(() => _loading = true);
+    _scaleController.reverse();
+    setState(() {
+      _loading = true;
+      _pressed = false;
+    });
     try {
       await widget.onActivate();
     } finally {
@@ -231,60 +293,138 @@ class _GateButtonState extends State<_GateButton> {
   @override
   void dispose() {
     _timer?.cancel();
+    _scaleController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isActive = _progress > 0 && !_loading;
+
     return GestureDetector(
       onTapDown: (_) => _onHoldStart(),
       onTapUp: (_) => _onHoldEnd(),
       onTapCancel: _onHoldEnd,
       behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 116,
-            height: 116,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: _loading ? null : _progress,
-                  strokeWidth: 6,
-                  backgroundColor: widget.color.withOpacity(0.12),
-                  valueColor: AlwaysStoppedAnimation(widget.color),
-                ),
-                Container(
-                  width: 92,
-                  height: 92,
-                  decoration: BoxDecoration(
-                    color: widget.color,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: widget.color.withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 6)),
-                    ],
-                  ),
-                  child: _loading
-                      ? const Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(widget.icon, color: Colors.white, size: 26),
-                            const SizedBox(height: 2),
-                            Text(widget.number,
-                                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, height: 1.0)),
-                          ],
-                        ),
-                ),
-              ],
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: child,
+          );
+        },
+        child: Container(
+          height: 84,
+          decoration: BoxDecoration(
+            color: _pressed
+                ? widget.color.withValues(alpha: 0.12)
+                : isActive
+                    ? widget.color.withValues(alpha: 0.08)
+                    : cs.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isActive
+                  ? widget.color.withValues(alpha: 0.4)
+                  : cs.outlineVariant.withValues(alpha: 0.4),
+              width: isActive ? 2 : 1,
             ),
+            boxShadow: _pressed
+                ? [
+                    BoxShadow(
+                      color: widget.color.withValues(alpha: 0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
-          const SizedBox(height: 10),
-          Text(widget.label, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-        ],
+          child: Stack(
+            children: [
+              if (isActive)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(19),
+                    child: LinearProgressIndicator(
+                      value: _progress,
+                      backgroundColor: Colors.transparent,
+                      valueColor: AlwaysStoppedAnimation(widget.color.withValues(alpha: 0.15)),
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: _loading
+                            ? widget.color
+                            : widget.color.withValues(alpha: _pressed ? 0.2 : 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: _loading
+                          ? Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: cs.surface,
+                              ),
+                            )
+                          : Icon(widget.icon, color: widget.color, size: 26),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.label,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: _pressed ? widget.color : cs.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.subtitle,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_loading)
+                      const SizedBox()
+                    else if (isActive)
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          value: _progress,
+                          color: widget.color,
+                          backgroundColor: widget.color.withValues(alpha: 0.15),
+                        ),
+                      )
+                    else
+                      Icon(
+                        Icons.touch_app_rounded,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                        size: 22,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
