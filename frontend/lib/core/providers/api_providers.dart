@@ -14,11 +14,19 @@ import '../models/accounting.dart';
 import '../models/dashboard.dart';
 import '../models/unit.dart';
 import '../models/amenity.dart';
+import '../services/stripe_checkout.dart';
 import 'api_providers_part2.dart';
 import 'api_providers_part3.dart';
 
 export 'api_providers_part2.dart';
 export 'api_providers_part3.dart';
+
+final stripeCheckoutProvider = Provider<StripeCheckoutService>((ref) {
+  return StripeCheckoutService(
+    paymentApi: ref.read(paymentApiProvider),
+    configApi: ref.read(configApiProvider),
+  );
+});
 
 final residentApiProvider = Provider<ResidentApi>((ref) => ResidentApi(ref.read(apiClientProvider)));
 final visitorApiProvider = Provider<VisitorApi>((ref) => VisitorApi(ref.read(apiClientProvider)));

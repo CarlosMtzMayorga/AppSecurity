@@ -9,7 +9,7 @@ import { requestLogger } from './middleware/requestLogger.js';
 import authRoutes from './routes/auth.js';
 import residentRoutes from './routes/residents.js';
 import accessRoutes from './routes/access.js';
-import paymentRoutes from './routes/payments.js';
+import paymentRoutes, { stripeWebhookHandler } from './routes/payments.js';
 import noticeRoutes from './routes/notices.js';
 import bookingRoutes from './routes/bookings.js';
 import serviceRoutes from './routes/services.js';
@@ -34,6 +34,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Stripe webhook: raw body required for signature verification, no authMiddleware. Must run before express.json
+app.post(`${API_PREFIX}/payments/webhook/stripe`, express.raw({ type: 'application/json' }), stripeWebhookHandler);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));

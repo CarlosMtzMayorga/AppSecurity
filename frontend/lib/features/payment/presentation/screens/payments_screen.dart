@@ -354,7 +354,7 @@ class _PaymentCard extends ConsumerWidget {
   Future<void> _payNow(BuildContext context, WidgetRef ref, String id) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(paymentApiProvider).payPayment(id);
+      await ref.read(stripeCheckoutProvider).pay(id);
       messenger.showSnackBar(const SnackBar(content: Text('Pago completado'), backgroundColor: Colors.green));
       ref.read(myPaymentsProvider.notifier).load();
       ref.read(paymentsProvider.notifier).loadPayments();

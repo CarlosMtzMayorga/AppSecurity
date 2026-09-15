@@ -65,7 +65,7 @@ class PaymentApi extends BaseApi {
     return (response.data['payments'] as List).map((e) => Payment.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<String> createStripeIntent(String paymentId) async {
+  Future<String?> createStripeIntent(String paymentId) async {
     final response = await dio.post('/payments/$paymentId/stripe-intent');
     return response.data['clientSecret'];
   }

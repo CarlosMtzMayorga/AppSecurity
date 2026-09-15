@@ -100,7 +100,7 @@ npm run dev
 - **Mis Visitantes** — Crear, editar, eliminar visitantes con código de acceso único
 - **Bitácora de accesos** — Historial completo con filtros y búsqueda
 - **Panel de Avisos** — Lectura de avisos de la administración
-- **Pagos** — Visualización de pagos y comprobantes
+- **Pagos** — Pago con tarjeta vía **Stripe PaymentSheet**, historial, estado por pago y comprobante PDF (o receipt de Stripe)
 - **Home estilo beResident** — Menú de navegación (Accesos, Avisos, Pago, Bitácora, Delegar)
 
 ### Panel Administrativo
@@ -130,8 +130,24 @@ POST   /access/peatonal     # Abrir puerta peatonal
 POST   /access/botonera     # Activar botonera
 POST   /visitors            # Crear visitante (con token QR)
 GET    /payments             # Listar pagos
+POST   /payments/:id/stripe-intent  # Crear PaymentIntent de Stripe para un pago
+POST   /payments/webhook/stripe     # Webhook de Stripe (payment_intent.succeeded/failed)
 GET    /notices             # Listar avisos
 ```
+
+## Pagos con Stripe
+
+- **Checkout**: la app obtiene la *publishable key* desde `GET /config/stripe-config` y abre el **PaymentSheet** de `flutter_stripe` (Flutter Web vía `flutter_stripe_web` + Stripe.js).
+- **Intento de pago**: `POST /payments/:id/stripe-intent` crea un PaymentIntent ligado al residente (Stripe Customer) con `metadata.paymentId`.
+- **Webhook**: `POST /payments/webhook/stripe` recibe `payment_intent.succeeded` / `payment_intent.payment_failed`, actualiza el estado del pago (`COMPLETED` / `FAILED`), guarda `receiptUrl` del charge y registra la entrada contable (con dedupe por `reference`).
+- **Recibo**: el residente puede descargar un comprobante PDF generado en el cliente (`pdf` + `printing`).
+
+Para desarrollo local reenvía los webhooks de Stripe:
+```bash
+stripe listen --forward-to localhost:3000/api/v1/payments/webhook/stripe
+# usa el whsec_ impreso en STRIPE_WEBHOOK_SECRET del backend/.env
+```
+Tarjeta de prueba: `4242 4242 4242 4242` (cualquier fecha futura, CVC cualquiera).
 
 ## Despliegue
 
@@ -153,7 +169,7 @@ PORT=3000
 
 ## Roadmap
 
-- [ ] Pasarela de pagos integrada (Stripe checkout)
+- [x] Pasarela de pagos integrada (Stripe checkout + webhooks)
 - [ ] Reservas de amenidades
 - [ ] Solicitudes de servicio e incidencias
 - [ ] App SaaS para empresas (multi-colonia, contabilidad consolidada, cuadrillas)

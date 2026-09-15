@@ -74,13 +74,11 @@ router.patch('/settings', asyncHandler(async (req: AuthRequest, res) => {
 }));
 
 router.get('/stripe-config', asyncHandler(async (req: AuthRequest, res) => {
-  if (!['ADMIN', 'COMMITTEE'].includes(req.user!.role)) throw new AppError(403, 'Sin permisos');
-  
   const settings = await prisma.complexSettings.findUnique({
     where: { complexId: req.user!.complexId },
     select: { stripePublishableKey: true },
   });
-  res.json({ publishableKey: settings?.stripePublishableKey });
+  res.json({ publishableKey: settings?.stripePublishableKey || process.env.STRIPE_PUBLISHABLE_KEY || '' });
 }));
 
 export default router;

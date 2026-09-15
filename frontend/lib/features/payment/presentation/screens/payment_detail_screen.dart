@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/providers/api_providers.dart';
 import '../../../../core/models/payment.dart';
+import '../../../../core/services/receipt_service.dart';
 
 class PaymentDetailScreen extends ConsumerStatefulWidget {
   final String paymentId;
@@ -88,13 +89,14 @@ class _PaymentDetailScreenState extends ConsumerState<PaymentDetailScreen> {
               ),
             ),
           ],
-          if (payment.receiptUrl != null) ...[
+          if (payment.receiptUrl != null || payment.status == PaymentStatus.completed) ...[
             const SizedBox(height: 16),
             Card(child: ListTile(
               leading: const Icon(Icons.receipt_long),
               title: const Text('Ver Comprobante'),
+              subtitle: const Text('PDF descargable'),
               trailing: const Icon(Icons.open_in_new),
-              onTap: () {},
+              onTap: () => _generateReceipt(payment),
             )),
           ],
         ],
@@ -105,11 +107,20 @@ class _PaymentDetailScreenState extends ConsumerState<PaymentDetailScreen> {
   Future<void> _payNow(Payment payment) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(paymentApiProvider).payPayment(payment.id);
+      await ref.read(stripeCheckoutProvider).pay(payment.id);
       messenger.showSnackBar(const SnackBar(content: Text('Pago completado'), backgroundColor: Colors.green));
       await ref.read(paymentDetailProvider(widget.paymentId).notifier).load();
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _generateReceipt(Payment payment) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ReceiptService.generateAndPrint(payment);
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Error al generar el comprobante: $e')));
     }
   }
 

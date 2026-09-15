@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { prisma } from '../index.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
@@ -241,10 +241,14 @@ router.post('/:id/stripe-intent', asyncHandler(async (req: AuthRequest, res) => 
   res.json({ clientSecret: paymentIntent.client_secret });
 }));
 
-router.post('/webhook/stripe', asyncHandler(async (req: AuthRequest, res) => {
+export const stripeWebhookHandler = asyncHandler(async (req: Request, res: Response) => {
   const sig = req.headers['stripe-signature']!;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-  
+  if (!webhookSecret || webhookSecret.startsWith('whsec_placeholder')) {
+    res.status(500).json({ error: 'STRIPE_WEBHOOK_SECRET no configurado' });
+    return;
+  }
+
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
@@ -257,24 +261,46 @@ router.post('/webhook/stripe', asyncHandler(async (req: AuthRequest, res) => {
   if (event.type === 'payment_intent.succeeded') {
     const intent = event.data.object as Stripe.PaymentIntent;
     const paymentId = intent.metadata.paymentId;
-    
+
+    let receiptUrl: string | null = null;
+    try {
+      const chargeId = intent.latest_charge;
+      if (chargeId) {
+        const charge = await stripe.charges.retrieve(chargeId as string);
+        receiptUrl = charge.receipt_url ?? null;
+      }
+    } catch (e) {
+      console.error('Error fetching charge for receipt:', e);
+    }
+
     await prisma.payment.update({
       where: { id: paymentId },
-      data: { status: 'COMPLETED', paidAt: new Date() },
+      data: { status: 'COMPLETED', paidAt: new Date(), receiptUrl },
     });
 
-    await prisma.accountingEntry.create({
-      data: {
-        complexId: (await prisma.payment.findUnique({ where: { id: paymentId }, select: { complexId: true } }))!.complexId,
-        type: 'INCOME',
-        category: 'MAINTENANCE',
-        amount: intent.amount / 100,
-        description: `Pago Stripe - ${intent.id}`,
-        reference: paymentId,
-        date: new Date(),
-        createdBy: 'STRIPE_WEBHOOK',
-      },
+    const existing = await prisma.accountingEntry.findFirst({
+      where: { reference: paymentId },
     });
+    if (!existing) {
+      const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+        select: { complexId: true },
+      });
+      if (payment) {
+        await prisma.accountingEntry.create({
+          data: {
+            complexId: payment.complexId,
+            type: 'INCOME',
+            category: 'MAINTENANCE',
+            amount: intent.amount / 100,
+            description: `Pago Stripe - ${intent.id}`,
+            reference: paymentId,
+            date: new Date(),
+            createdBy: 'STRIPE_WEBHOOK',
+          },
+        });
+      }
+    }
   } else if (event.type === 'payment_intent.payment_failed') {
     const intent = event.data.object as Stripe.PaymentIntent;
     const paymentId = intent.metadata.paymentId;
@@ -285,7 +311,7 @@ router.post('/webhook/stripe', asyncHandler(async (req: AuthRequest, res) => {
   }
 
   res.json({ received: true });
-}));
+});
 
 router.patch('/:id', asyncHandler(async (req: AuthRequest, res) => {
   if (!['ADMIN', 'COMMITTEE'].includes(req.user!.role)) throw new AppError(403, 'Sin permisos');

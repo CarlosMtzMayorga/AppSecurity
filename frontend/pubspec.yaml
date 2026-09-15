@@ -72,16 +72,18 @@ dependencies:
   uuid: ^4.2.2
   jwt_decoder: ^2.0.1
   web: ^1.0.0
+  flutter_stripe: ^14.0.0
+  flutter_stripe_web: ^8.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
   riverpod_generator: ^2.3.9
-  retrofit_generator: ^8.0.6
   build_runner: ^2.4.7
-  custom_lint: ^0.6.0
   riverpod_lint: ^2.3.7
+  custom_lint: ^0.7.4
+  retrofit_generator: ^9.6.0
 
 flutter:
   uses-material-design: true
