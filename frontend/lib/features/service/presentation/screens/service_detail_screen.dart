@@ -17,7 +17,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadService();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadService());
   }
 
   Future<void> _loadService() async {

@@ -214,7 +214,10 @@ class _AllServicesTab extends ConsumerWidget {
               itemCount: state.requests.length + (state.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index == state.requests.length) {
-                  if (!state.isLoading && state.hasMore) ref.read(servicesProvider.notifier).loadMore();
+                  if (!state.isLoading && state.hasMore) {
+                    final notifier = ref.read(servicesProvider.notifier);
+                    WidgetsBinding.instance.addPostFrameCallback((_) => notifier.loadMore());
+                  }
                   return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
                 }
                 return _ServiceCard(request: state.requests[index]);

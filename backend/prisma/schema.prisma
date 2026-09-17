@@ -109,9 +109,28 @@ model User {
   serviceRequestsAssigned ServiceRequest[] @relation("ServiceRequestAssignee")
   securityAccessLogs AccessLog[] @relation("AccessLogSecurityUser")
   tokens        AuthToken[]
+  pushTokens    PushToken[]
 
   @@index([email])
   @@index([role])
+}
+
+model PushToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complexId  String
+  complex    ResidentialComplex @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  token      String
+  platform   String   @default("web") // web | android | ios
+  deviceName String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, token])
+  @@index([complexId])
+  @@index([userId])
+  @@index([token])
 }
 
 model AuthToken {
@@ -157,6 +176,7 @@ model ResidentialComplex {
   accountingEntries AccountingEntry[]
   accessConfig AccessConfig[]
   settings ComplexSettings?
+  pushTokens  PushToken[]
 
   @@index([adminId])
 }

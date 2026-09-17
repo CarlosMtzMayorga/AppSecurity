@@ -82,7 +82,7 @@ class _ResidentsScreenState extends ConsumerState<ResidentsScreen> {
                         if (index == state.residents.length) {
                           if (!_isLoading && state.hasMore) {
                             _page++;
-                            _loadResidents();
+WidgetsBinding.instance.addPostFrameCallback((_) => _loadResidents());
                           }
                           return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
                         }
@@ -161,7 +161,7 @@ class _AddResidentDialogState extends ConsumerState<_AddResidentDialog> {
   @override
   void initState() {
     super.initState();
-    _loadUnits();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadUnits());
   }
 
   @override

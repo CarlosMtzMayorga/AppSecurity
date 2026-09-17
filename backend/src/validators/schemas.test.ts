@@ -7,6 +7,8 @@ import {
   createPaymentSchema,
   createBookingSchema,
   paginationSchema,
+  pushTokenSchema,
+  createNoticeSchema,
 } from './schemas.js';
 
 describe('schemas de validación', () => {
@@ -120,6 +122,46 @@ describe('schemas de validación', () => {
 
     it('rechaza página inválida', () => {
       expect(() => paginationSchema.parse({ page: 0 })).toThrow();
+    });
+  });
+
+  describe('pushTokenSchema', () => {
+    it('acepta un token web válido', () => {
+      const result = pushTokenSchema.parse({
+        token: 'fJcXxLk-MUST_VALID_FCM_TOKEN_0001',
+        platform: 'web',
+        deviceName: 'Chrome macOS',
+      });
+      expect(result.platform).toBe('web');
+    });
+
+    it('accepts android/ios platforms', () => {
+      const result = pushTokenSchema.parse({ token: 'abc123def456', platform: 'android' });
+      expect(result.platform).toBe('android');
+    });
+
+    it('rechaza token demasiado corto', () => {
+      expect(() => pushTokenSchema.parse({ token: 'corto' })).toThrow();
+    });
+
+    it('rechaza plataforma desconocida', () => {
+      expect(() => pushTokenSchema.parse({ token: 'abcdefghij', platform: 'desktop' })).toThrow();
+    });
+  });
+
+  describe('createNoticeSchema', () => {
+    it('acepta envío de push opcional', () => {
+      const result = createNoticeSchema.parse({
+        title: 'Aviso',
+        content: 'Contenido',
+        sendPush: false,
+      });
+      expect(result.sendPush).toBe(false);
+    });
+
+    it('permite without sendPush (default)', () => {
+      const result = createNoticeSchema.parse({ title: 'Aviso', content: 'Contenido' });
+      expect(result.sendPush).toBeUndefined();
     });
   });
 });

@@ -68,6 +68,10 @@ export default function NoticeCreateDialog() {
             <input type="checkbox" name="isPinned" />
             Fijar aviso
           </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="sendPush" defaultChecked />
+            Notificar por push
+          </label>
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"

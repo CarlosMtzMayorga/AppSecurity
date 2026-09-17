@@ -19,6 +19,8 @@ import unitRoutes from './routes/units.js';
 import visitorRoutes from './routes/visitors.js';
 import amenityRoutes from './routes/amenities.js';
 import dashboardRoutes from './routes/dashboard.js';
+import pushRoutes from './routes/push.js';
+import { startMonthlyPaymentCron } from './jobs/monthlyPayments.js';
 
 export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
@@ -60,6 +62,7 @@ app.use(`${API_PREFIX}/units`, authMiddleware, unitRoutes);
 app.use(`${API_PREFIX}/visitors`, authMiddleware, visitorRoutes);
 app.use(`${API_PREFIX}/amenities`, authMiddleware, amenityRoutes);
 app.use(`${API_PREFIX}/dashboard`, authMiddleware, dashboardRoutes);
+app.use(`${API_PREFIX}/push`, authMiddleware, pushRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint no encontrado', path: req.path });
@@ -71,6 +74,7 @@ async function main() {
   try {
     await prisma.$connect();
     console.log('✅ Conectado a PostgreSQL');
+    startMonthlyPaymentCron();
     
     app.listen(PORT, () => {
       console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);

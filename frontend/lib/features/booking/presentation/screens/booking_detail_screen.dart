@@ -17,7 +17,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBooking();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBooking());
   }
 
   Future<void> _loadBooking() async {

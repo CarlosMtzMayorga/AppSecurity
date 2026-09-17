@@ -91,7 +91,7 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen> {
       builder: (context) => const _CreateNoticeDialog(),
     ).then((created) {
       if (created == true) {
-        _loadNotices();
+WidgetsBinding.instance.addPostFrameCallback((_) => _loadNotices());
         ref.invalidate(unreadNoticesProvider);
       }
     });
@@ -268,7 +268,10 @@ class _NoticesList extends ConsumerWidget {
                         itemCount: state.notices.length + (state.hasMore ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == state.notices.length) {
-                            if (!state.isLoading && state.hasMore) ref.read(noticesProvider.notifier).loadMore();
+                            if (!state.isLoading && state.hasMore) {
+                              final notifier = ref.read(noticesProvider.notifier);
+                              WidgetsBinding.instance.addPostFrameCallback((_) => notifier.loadMore());
+                            }
                             return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
                           }
                           final notice = state.notices[index];

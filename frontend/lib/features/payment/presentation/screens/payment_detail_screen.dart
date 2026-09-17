@@ -18,7 +18,7 @@ class _PaymentDetailScreenState extends ConsumerState<PaymentDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPayment();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPayment());
   }
 
   Future<void> _loadPayment() async {

@@ -5,6 +5,7 @@ import 'config/app_config.dart';
 import 'core/providers/app_providers.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/services/push_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,10 +22,14 @@ class AppSecurityApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    
+    // El router se adjunta al servicio de push para navegar al tocar
+    // una notificación (se re-ejecuta de forma idempotente).
+    WidgetsBinding.instance.addPostFrameCallback((_) => PushService.instance.attachRouter(router));
+
     return MaterialApp.router(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: PushService.instance.scaffoldMessengerKey,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,

@@ -80,8 +80,8 @@ class UnitInfo extends Equatable {
   String get displayNumber => block != null ? '$block-$number' : number;
 
   factory UnitInfo.fromJson(Map<String, dynamic> json) => UnitInfo(
-    id: json['id'],
-    number: json['number'],
+    id: json['id'] ?? '',
+    number: json['number'] ?? '',
     block: json['block'],
     floor: json['floor'],
   );

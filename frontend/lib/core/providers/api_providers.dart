@@ -192,6 +192,11 @@ class AccessApi extends BaseApi {
     await dio.post('/access/botonera');
   }
 
+  Future<VehicleBlockResult> getVehicleBlock() async {
+    final response = await dio.get('/access/vehicle-block');
+    return VehicleBlockResult.fromJson(response.data);
+  }
+
   Future<AccessLog> approveAccess(String id, {required String status, String? notes}) async {
     final response = await dio.patch('/access/$id/approve', data: {'status': status, 'notes': notes});
     return AccessLog.fromJson(response.data);

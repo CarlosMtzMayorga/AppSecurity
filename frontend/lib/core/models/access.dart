@@ -3,6 +3,25 @@ import 'user.dart';
 
 enum AccessType { resident, visitor, service, delivery, emergency }
 enum AccessStatus { pending, approved, rejected, expired, completed }
+enum VehicleBlockStatus { free, blocked }
+
+class VehicleBlockResult extends Equatable {
+  final VehicleBlockStatus status;
+  final String? message;
+
+  const VehicleBlockResult({required this.status, this.message});
+
+  factory VehicleBlockResult.fromJson(Map<String, dynamic> json) {
+    final blocked = json['blocked'] == true;
+    return VehicleBlockResult(
+      status: blocked ? VehicleBlockStatus.blocked : VehicleBlockStatus.free,
+      message: json['message'],
+    );
+  }
+
+  @override
+  List<Object?> get props => [status, message];
+}
 
 class AccessLog extends Equatable {
   final String id;
@@ -90,7 +109,7 @@ class ResidentInfo extends Equatable {
   String get fullName => '$firstName $lastName';
 
   factory ResidentInfo.fromJson(Map<String, dynamic> json) => ResidentInfo(
-    id: json['id'] ?? json['user']?['id'],
+    id: json['id'] ?? json['user']?['id'] ?? '',
     firstName: json['user']?['firstName'] ?? json['firstName'] ?? '',
     lastName: json['user']?['lastName'] ?? json['lastName'] ?? '',
   );

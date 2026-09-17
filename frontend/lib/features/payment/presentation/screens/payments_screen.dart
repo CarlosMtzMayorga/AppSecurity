@@ -25,7 +25,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> with SingleTick
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadPayments();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPayments());
   }
 
   @override
@@ -36,9 +36,12 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> with SingleTick
   }
 
   Future<void> _loadPayments() async {
-    await ref.read(paymentsProvider.notifier).loadPayments(
-      status: _statusFilter == 'ALL' ? null : _statusFilter,
-    );
+    await Future.wait([
+      ref.read(paymentsProvider.notifier).loadPayments(
+        status: _statusFilter == 'ALL' ? null : _statusFilter,
+      ),
+      ref.read(myPaymentsProvider.notifier).load(),
+    ]);
   }
 
   @override
@@ -333,7 +336,11 @@ class _AllPaymentsTab extends ConsumerWidget {
                     itemCount: state.payments.length + (state.hasMore ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index == state.payments.length) {
-                        if (!state.isLoading && state.hasMore) ref.read(paymentsProvider.notifier).loadMore();
+                        if (!state.isLoading && state.hasMore) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (context.mounted) ref.read(paymentsProvider.notifier).loadMore();
+                          });
+                        }
                         return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
                       }
                       return _PaymentCard(payment: state.payments[index], onTap: () => context.push('/payments/${state.payments[index].id}'));

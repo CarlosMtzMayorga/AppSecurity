@@ -166,9 +166,9 @@ router.post('/register', asyncHandler(async (req, res) => {
 
 router.post('/login', asyncHandler(async (req, res) => {
   const data = loginSchema.parse(req.body);
-  
+
   const user = await prisma.user.findUnique({
-    where: { email: data.email },
+    where: { email: data.email.trim().toLowerCase() },
   });
 
   if (!user || !user.isActive) {

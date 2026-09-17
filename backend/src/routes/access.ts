@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../index.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { AuthRequest } from '../middleware/auth.js';
+import { getVehicleBlockStatus } from '../services/accessBlock.js';
 import {
   createAccessLogSchema,
   approveAccessSchema,
@@ -64,6 +65,16 @@ router.get('/active', asyncHandler(async (req: AuthRequest, res) => {
   res.json(logs);
 }));
 
+router.get('/vehicle-block', asyncHandler(async (req: AuthRequest, res) => {
+  if (req.user!.role !== 'RESIDENT') throw new AppError(403, 'Solo residentes');
+
+  const resident = await prisma.resident.findUnique({ where: { userId: req.user!.id } });
+  if (!resident) throw new AppError(404, 'Perfil de residente no encontrado');
+
+  const status = await getVehicleBlockStatus(req.user!.complexId!, resident.unitId);
+  res.json(status);
+}));
+
 router.get('/:id', asyncHandler(async (req: AuthRequest, res) => {
   const log = await prisma.accessLog.findFirst({
     where: { id: req.params.id, complexId: req.user!.complexId },
@@ -124,6 +135,9 @@ router.post('/resident-entry', asyncHandler(async (req: AuthRequest, res) => {
   const resident = await prisma.resident.findUnique({ where: { userId: req.user!.id } });
   if (!resident) throw new AppError(404, 'Perfil de residente no encontrado');
 
+  const block = await getVehicleBlockStatus(req.user!.complexId!, resident.unitId);
+  if (block.blocked) throw new AppError(403, block.message || 'Acceso vehicular suspendido');
+
   const log = await prisma.accessLog.create({
     data: {
       complexId: req.user!.complexId!,
@@ -144,6 +158,9 @@ router.post('/resident-exit', asyncHandler(async (req: AuthRequest, res) => {
   
   const resident = await prisma.resident.findUnique({ where: { userId: req.user!.id } });
   if (!resident) throw new AppError(404, 'Perfil de residente no encontrado');
+
+  const block = await getVehicleBlockStatus(req.user!.complexId!, resident.unitId);
+  if (block.blocked) throw new AppError(403, block.message || 'Acceso vehicular suspendido');
 
   const activeLog = await prisma.accessLog.findFirst({
     where: { residentId: resident.id, status: 'APPROVED', exitTime: null },

@@ -486,7 +486,8 @@ class _EntriesTab extends ConsumerWidget {
               itemBuilder: (context, index) {
                 if (index == state.entries.length) {
                   if (!state.isLoading && state.hasMore) {
-                    ref.read(accountingEntriesProvider.notifier).loadMore();
+                    final notifier = ref.read(accountingEntriesProvider.notifier);
+                    WidgetsBinding.instance.addPostFrameCallback((_) => notifier.loadMore());
                   }
                   return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
                 }

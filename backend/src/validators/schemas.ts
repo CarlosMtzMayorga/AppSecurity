@@ -11,7 +11,7 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
+  email: z.string().trim().toLowerCase().email('Email inválido'),
   password: z.string().min(1, 'Contraseña requerida'),
 });
 
@@ -44,7 +44,7 @@ export const createResidentSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   phone: z.string().optional(),
-  unitId: z.string().uuid('Unit ID inválido'),
+  unitId: z.string().min(1, 'Unit ID inválido'),
   rut: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
@@ -96,8 +96,8 @@ export const updateVisitorSchema = z.object({
 });
 
 export const createAccessLogSchema = z.object({
-  unitId: z.string().uuid().optional(),
-  visitorId: z.string().uuid().optional(),
+  unitId: z.string().min(1).optional(),
+  visitorId: z.string().min(1).optional(),
   type: z.enum(['RESIDENT', 'VISITOR', 'SERVICE', 'DELIVERY', 'EMERGENCY']),
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'EXPIRED', 'COMPLETED']).optional(),
   scheduledEntry: z.string().datetime().optional(),
@@ -112,7 +112,7 @@ export const approveAccessSchema = z.object({
 });
 
 export const createPaymentSchema = z.object({
-  residentId: z.string().uuid(),
+  residentId: z.string().min(1, 'Residente requerido'),
   type: z.enum(['MAINTENANCE', 'EXTRAORDINARY', 'AMENITY', 'PENALTY', 'OTHER']),
   amount: z.number().positive('Monto debe ser positivo'),
   description: z.string().min(1),
@@ -140,6 +140,7 @@ export const createNoticeSchema = z.object({
   attachmentUrls: z.array(z.string().url()).optional(),
   targetRoles: z.array(z.enum(['ADMIN', 'RESIDENT', 'SECURITY', 'COMMITTEE'])).optional(),
   targetUnits: z.array(z.string()).optional(),
+  sendPush: z.boolean().optional(),
 });
 
 export const updateNoticeSchema = z.object({
@@ -156,8 +157,8 @@ export const updateNoticeSchema = z.object({
 });
 
 export const createBookingSchema = z.object({
-  amenityId: z.string().uuid(),
-  unitId: z.string().uuid(),
+  amenityId: z.string().min(1, 'Amenidad requerida'),
+  unitId: z.string().min(1, 'Unidad requerida'),
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
   guestsCount: z.number().int().positive().optional(),
@@ -170,7 +171,7 @@ export const updateBookingSchema = z.object({
 });
 
 export const createServiceRequestSchema = z.object({
-  unitId: z.string().uuid(),
+  unitId: z.string().min(1, 'Unidad requerida'),
   title: z.string().min(1).max(200),
   description: z.string().min(1),
   category: z.string().min(1),
@@ -185,7 +186,7 @@ export const updateServiceRequestSchema = z.object({
   category: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED']).optional(),
-  assigneeId: z.string().uuid().optional(),
+  assigneeId: z.string().min(1).optional(),
   estimatedCost: z.number().optional(),
   actualCost: z.number().optional(),
   resolutionNotes: z.string().optional(),
@@ -249,6 +250,12 @@ export const createComplexSchema = z.object({
   email: z.string().email().optional(),
   timezone: z.string().optional(),
   currency: z.string().optional(),
+});
+
+export const pushTokenSchema = z.object({
+  token: z.string().min(10, 'Token de dispositivo inválido'),
+  platform: z.enum(['web', 'android', 'ios']).optional(),
+  deviceName: z.string().max(100).optional(),
 });
 
 export const paginationSchema = z.object({

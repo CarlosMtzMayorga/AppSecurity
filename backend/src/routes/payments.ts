@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { prisma } from '../index.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { AuthRequest } from '../middleware/auth.js';
+import { autoCreateMonthlyPayments } from '../jobs/monthlyPayments.js';
 import {
   createPaymentSchema,
   updatePaymentSchema,
@@ -171,6 +172,13 @@ router.post('/bulk', asyncHandler(async (req: AuthRequest, res) => {
   }));
 
   res.status(201).json({ created: payments.length, payments });
+}));
+
+router.post('/auto-create-monthly', asyncHandler(async (req: AuthRequest, res) => {
+  if (!['ADMIN', 'COMMITTEE'].includes(req.user!.role)) throw new AppError(403, 'Sin permisos');
+
+  const created = await autoCreateMonthlyPayments();
+  res.status(201).json({ created });
 }));
 
 router.post('/:id/webhook/test', asyncHandler(async (req: AuthRequest, res) => {

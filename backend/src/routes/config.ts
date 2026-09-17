@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../index.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { AuthRequest } from '../middleware/auth.js';
+import { getPublicMessagingConfig } from '../services/pushService.js';
 
 const router = Router();
 
@@ -79,6 +80,10 @@ router.get('/stripe-config', asyncHandler(async (req: AuthRequest, res) => {
     select: { stripePublishableKey: true },
   });
   res.json({ publishableKey: settings?.stripePublishableKey || process.env.STRIPE_PUBLISHABLE_KEY || '' });
+}));
+
+router.get('/messaging', asyncHandler(async (_req: AuthRequest, res) => {
+  res.json(getPublicMessagingConfig());
 }));
 
 export default router;

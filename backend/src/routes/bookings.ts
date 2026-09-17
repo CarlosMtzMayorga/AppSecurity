@@ -8,6 +8,7 @@ import {
   paginationSchema,
   dateRangeSchema,
 } from '../validators/schemas.js';
+import { sendPushToUsers } from '../services/pushService.js';
 
 const router = Router();
 
@@ -227,6 +228,19 @@ router.patch('/:id', asyncHandler(async (req: AuthRequest, res) => {
     },
     include: { amenity: { select: { name: true } } },
   });
+
+  if (data.status && data.status !== booking.status && ['CONFIRMED', 'CANCELLED', 'REJECTED'].includes(data.status)) {
+    const labels: Record<string, string> = {
+      CONFIRMED: '✓ Reserva confirmada',
+      CANCELLED: 'Reserva cancelada',
+      REJECTED: 'Reserva rechazada',
+    };
+    sendPushToUsers([updated.userId], {
+      title: labels[data.status],
+      body: `Tu reserva de ${updated.amenity.name} ${data.status === 'REJECTED' && data.rejectionReason ? `(${data.rejectionReason})` : ''}`.trim(),
+      route: `/bookings/${updated.id}`,
+    }).catch((e) => console.error('Error enviando push de reserva:', e));
+  }
 
   res.json(updated);
 }));

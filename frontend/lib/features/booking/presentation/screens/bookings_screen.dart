@@ -106,7 +106,7 @@ class _CreateBookingDialogState extends ConsumerState<_CreateBookingDialog> {
   @override
   void initState() {
     super.initState();
-    _loadAmenities();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAmenities());
   }
 
   @override
@@ -359,7 +359,10 @@ class _AllBookingsTab extends ConsumerWidget {
               itemCount: state.bookings.length + (state.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index == state.bookings.length) {
-                  if (!state.isLoading && state.hasMore) ref.read(bookingsProvider.notifier).loadMore();
+                  if (!state.isLoading && state.hasMore) {
+                    final notifier = ref.read(bookingsProvider.notifier);
+                    WidgetsBinding.instance.addPostFrameCallback((_) => notifier.loadMore());
+                  }
                   return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
                 }
                 return _BookingCard(booking: state.bookings[index]);

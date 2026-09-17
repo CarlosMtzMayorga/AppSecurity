@@ -17,7 +17,7 @@ class _AccessDetailScreenState extends ConsumerState<AccessDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAccess();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAccess());
   }
 
   Future<void> _loadAccess() async {

@@ -7,6 +7,8 @@ import {
   updateNoticeSchema,
   paginationSchema,
 } from '../validators/schemas.js';
+import { sendPushToComplex } from '../services/pushService.js';
+import { UserRole } from '@prisma/client';
 
 const router = Router();
 
@@ -125,6 +127,25 @@ router.post('/', asyncHandler(async (req: AuthRequest, res) => {
     },
     include: { author: { select: { firstName: true, lastName: true } } },
   });
+
+  // Send push notification when the notice is published now (or immediately).
+  if (data.sendPush !== false && notice.publishAt <= new Date()) {
+    const roles =
+      data.targetRoles && data.targetRoles.length > 0
+        ? (data.targetRoles as UserRole[])
+        : (Object.values(UserRole) as UserRole[]);
+    const unitIds = data.targetUnits && data.targetUnits.length > 0 ? data.targetUnits : undefined;
+
+    sendPushToComplex(
+      req.user!.complexId!,
+      { roles, unitIds, excludeUserIds: [req.user!.id] },
+      {
+        title: notice.type === 'URGENT' ? `🔴 ${notice.title}` : notice.title,
+        body: notice.content.length > 120 ? `${notice.content.slice(0, 120)}…` : notice.content,
+        route: `/notices/${notice.id}`,
+      }
+    ).catch((e) => console.error('Error enviando push de aviso:', e));
+  }
 
   res.status(201).json(notice);
 }));

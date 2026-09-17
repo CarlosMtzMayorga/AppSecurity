@@ -100,6 +100,7 @@ npm run dev
 - **Mis Visitantes** — Crear, editar, eliminar visitantes con código de acceso único
 - **Bitácora de accesos** — Historial completo con filtros y búsqueda
 - **Panel de Avisos** — Lectura de avisos de la administración
+- **Notificaciones push (FCM)** — Avisos nuevos, confirmación/cancelación de reservas y banner en primer plano; registra el token del dispositivo contra el backend
 - **Pagos** — Pago con tarjeta vía **Stripe PaymentSheet**, historial, estado por pago y comprobante PDF (o receipt de Stripe)
 - **Home estilo beResident** — Menú de navegación (Accesos, Avisos, Pago, Bitácora, Delegar)
 
@@ -115,6 +116,7 @@ npm run dev
 - Autenticación JWT con refresh tokens
 - CRUD completo de residentes, unidades, pagos, accesos, visitantes
 - Endpoints de portón: `/access/peatonal`, `/access/botonera`
+- Notificaciones push FCM: registro/eliminación de device tokens (`POST/DELETE /push/tokens`), envío al crear avisos y al cambiar estado de reservas
 - Validación con Zod y manejo de errores
 
 ## Endpoints Principales
@@ -133,7 +135,45 @@ GET    /payments             # Listar pagos
 POST   /payments/:id/stripe-intent  # Crear PaymentIntent de Stripe para un pago
 POST   /payments/webhook/stripe     # Webhook de Stripe (payment_intent.succeeded/failed)
 GET    /notices             # Listar avisos
+POST   /push/tokens         # Registrar device token FCM
+DELETE /push/tokens         # Eliminar device token FCM
+GET    /config/messaging    # Config pública de FCM (enabled, vapidKey, firebase)
 ```
+
+## Notificaciones Push (FCM)
+
+El sistema envía notificaciones push con **Firebase Cloud Messaging**:
+
+- **Backend** (`firebase-admin`): el `POST /notices` dispara un push a los roles/unidades objetivo del aviso (si `sendPush !== false` y `publishAt` ya llegó), y el `PATCH /bookings/:id` notifica al residente cuando su reserva se confirma, cancela o rechaza.
+- **Device tokens**: la app registra su token con `POST /push/tokens` al iniciar sesión y lo elimina con `DELETE /push/tokens?token=...` al cerrar sesión. El backend purga automáticamente tokens inválidos (desinstalaciones).
+- **Frontend Flutter Web**: usa `firebase_core` + `firebase_messaging`. Pide permiso, obtiene el token (VAPID en web) y muestra un banner (SnackBar) en primer plano; al tocar la notificación navega al detalle. El archivo `web/firebase-messaging-sw.js` entrega las notificaciones de segundo plano (Nginx no lo cachea como inmutable).
+
+### Configuración
+
+1. Crea un proyecto en [Firebase Console](https://console.firebase.google.com) y genera un **Service Account** en *Configuración del proyecto → Cuentas de servicio*.
+2. En `backend/.env` (ver `.env.example`):
+   ```env
+   FIREBASE_SERVICE_ACCOUNT_JSON="`cat service-account.json | base64`"
+   # o bien los campos sueltos:
+   FIREBASE_PROJECT_ID=...
+   FIREBASE_CLIENT_EMAIL=...
+   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   # Config web pública (la expone GET /config/messaging):
+   FIREBASE_API_KEY=...
+   FIREBASE_AUTH_DOMAIN=...
+   FIREBASE_STORAGE_BUCKET=...
+   FIREBASE_MSG_SENDER_ID=...
+   FIREBASE_APP_ID=...
+   FIREBASE_VAPID_KEY=...
+   ```
+3. Sustituye los valores de `FIREBASE_CONFIG` en `frontend/web/firebase-messaging-sw.js` (deben coincidir con la config web anterior), o copia `web/firebase-config.example.json` a `web/firebase-config.json` y rellena sus valores (el service worker la usará con prioridad).
+4. Aplica la migración y levanta el backend:
+   ```bash
+   cd backend && npx prisma migrate deploy
+   ```
+5. Si el frontend no llega a la API (diferente origen en producción), configura el proxy `/api/` de Nginx apuntando al backend.
+
+> Nota: la notificación push solo se envía si `GET /config/messaging` devuelve `enabled: true` (es decir, si el backend tiene credenciales FCM configuradas).
 
 ## Pagos con Stripe
 
@@ -170,10 +210,10 @@ PORT=3000
 ## Roadmap
 
 - [x] Pasarela de pagos integrada (Stripe checkout + webhooks)
+- [x] Notificaciones push (Firebase Cloud Messaging)
 - [ ] Reservas de amenidades
 - [ ] Solicitudes de servicio e incidencias
 - [ ] App SaaS para empresas (multi-colonia, contabilidad consolidada, cuadrillas)
-- [ ] Notificaciones push (Firebase Cloud Messaging)
 - [ ] Autometracción biométrica (huella/rostro)
 - [ ] Integración con hardware IoT de caseta
 

@@ -21,7 +21,7 @@ class _VisitorManagementScreenState extends ConsumerState<VisitorManagementScree
   @override
   void initState() {
     super.initState();
-    _loadVisitors();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadVisitors());
   }
 
   @override

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../network/api_client.dart';
 import '../models/user.dart';
+import '../services/push_service.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
@@ -56,6 +58,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final response = await _api.dio.get('/auth/me');
       final user = User.fromJson(response.data['user']);
       state = state.copyWith(user: user, isLoading: false, error: null);
+      unawaited(PushService.instance.initialize(_api));
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       await logout();
@@ -69,6 +72,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _api.setTokens(response.data['accessToken'], response.data['refreshToken']);
       final user = User.fromJson(response.data['user']);
       state = state.copyWith(user: user, isLoading: false);
+      unawaited(PushService.instance.initialize(_api));
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
       rethrow;
@@ -98,6 +102,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _api.setTokens(response.data['accessToken'], response.data['refreshToken']);
       final user = User.fromJson(response.data['user']);
       state = state.copyWith(user: user, isLoading: false);
+      unawaited(PushService.instance.initialize(_api));
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
       rethrow;
@@ -105,6 +110,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    await PushService.instance.unregisterFromBackend(_api);
     await _api.clearTokens();
     state = const AuthState();
   }

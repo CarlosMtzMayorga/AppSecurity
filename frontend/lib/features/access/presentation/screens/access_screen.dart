@@ -28,7 +28,7 @@ class _AccessScreenState extends ConsumerState<AccessScreen> with SingleTickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabCount, vsync: this);
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   @override
@@ -42,6 +42,7 @@ class _AccessScreenState extends ConsumerState<AccessScreen> with SingleTickerPr
     await Future.wait([
       ref.read(accessLogsProvider.notifier).loadLogs(),
       ref.read(activeAccessesProvider.notifier).loadActive(),
+      ref.read(vehicleBlockProvider.notifier).load(),
     ]);
   }
 
@@ -95,10 +96,38 @@ class _GateControlTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final block = ref.watch(vehicleBlockProvider);
+    final vehicleBlocked = block?.status == VehicleBlockStatus.blocked;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       children: [
+        if (vehicleBlocked) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.errorContainer.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.no_crash, color: theme.colorScheme.onErrorContainer),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    block?.message ??
+                        'Cuota del mes pendiente. Acceso vehicular suspendido.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
@@ -124,17 +153,19 @@ class _GateControlTab extends ConsumerWidget {
         const SizedBox(height: 24),
         _GateButton(
           label: 'Entrada',
-          subtitle: 'Puerta vehicular principal',
+          subtitle: vehicleBlocked ? 'Suspendida por cuota pendiente' : 'Puerta vehicular principal',
           icon: Icons.login_rounded,
           color: const Color(0xFF16A34A),
+          enabled: !vehicleBlocked,
           onActivate: () => _gateEntry(context, ref),
         ),
         const SizedBox(height: 14),
         _GateButton(
           label: 'Salida',
-          subtitle: 'Puerta vehicular de salida',
+          subtitle: vehicleBlocked ? 'Suspendida por cuota pendiente' : 'Puerta vehicular de salida',
           icon: Icons.logout_rounded,
           color: const Color(0xFFDC2626),
+          enabled: !vehicleBlocked,
           onActivate: () => _gateExit(context, ref),
         ),
         const SizedBox(height: 14),
@@ -204,6 +235,7 @@ class _GateButton extends StatefulWidget {
   final String subtitle;
   final IconData icon;
   final Color color;
+  final bool enabled;
   final Future<void> Function() onActivate;
 
   const _GateButton({
@@ -211,6 +243,7 @@ class _GateButton extends StatefulWidget {
     required this.subtitle,
     required this.icon,
     required this.color,
+    this.enabled = true,
     required this.onActivate,
   });
 
@@ -242,7 +275,7 @@ class _GateButtonState extends State<_GateButton> with SingleTickerProviderState
   }
 
   void _onHoldStart() {
-    if (_loading) return;
+    if (_loading || !widget.enabled) return;
     _hold
       ..reset()
       ..start();
@@ -302,6 +335,7 @@ class _GateButtonState extends State<_GateButton> with SingleTickerProviderState
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isActive = _progress > 0 && !_loading;
+    final disabled = !widget.enabled;
 
     return GestureDetector(
       onTapDown: (_) => _onHoldStart(),
@@ -375,7 +409,7 @@ class _GateButtonState extends State<_GateButton> with SingleTickerProviderState
                                 color: cs.surface,
                               ),
                             )
-                          : Icon(widget.icon, color: widget.color, size: 26),
+                          : Icon(widget.icon, color: disabled ? cs.onSurfaceVariant.withValues(alpha: 0.6) : widget.color, size: 26),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -413,12 +447,18 @@ class _GateButtonState extends State<_GateButton> with SingleTickerProviderState
                           backgroundColor: widget.color.withValues(alpha: 0.15),
                         ),
                       )
-                    else
-                      Icon(
-                        Icons.touch_app_rounded,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                        size: 22,
-                      ),
+else if (disabled)
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                      size: 22,
+                    )
+                  else
+                    Icon(
+                      Icons.touch_app_rounded,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                      size: 22,
+                    ),
                   ],
                 ),
               ),
@@ -489,7 +529,8 @@ class _AccessLogsTab extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       if (index == state.logs.length) {
                         if (!state.isLoading && state.hasMore) {
-                          ref.read(accessLogsProvider.notifier).loadMore();
+                          final notifier = ref.read(accessLogsProvider.notifier);
+                          WidgetsBinding.instance.addPostFrameCallback((_) => notifier.loadMore());
                         }
                         return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
                       }
@@ -838,6 +879,23 @@ class MyVisitorsNotifier extends StateNotifier<MyVisitorsState> {
       state = state.copyWith(isLoading: false, visitors: visitors);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+}
+
+final vehicleBlockProvider = StateNotifierProvider<VehicleBlockNotifier, VehicleBlockResult?>((ref) {
+  return VehicleBlockNotifier(ref.read(accessApiProvider));
+});
+
+class VehicleBlockNotifier extends StateNotifier<VehicleBlockResult?> {
+  final AccessApi _api;
+  VehicleBlockNotifier(this._api) : super(null);
+
+  Future<void> load() async {
+    try {
+      state = await _api.getVehicleBlock();
+    } catch (_) {
+      state = null;
     }
   }
 }

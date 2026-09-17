@@ -47,7 +47,7 @@ async function main() {
     update: {},
     create: {
       complexId: complex.id,
-      maintenanceFee: 2500,
+      maintenanceFee: 250,
       extraordinaryFee: 5000,
       lateFeePercent: 5,
       lateFeeGraceDays: 5,

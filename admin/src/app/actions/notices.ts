@@ -12,6 +12,7 @@ export async function createNotice(_prev: ActionResult, formData: FormData): Pro
     content: String(formData.get('content') ?? ''),
     type: String(formData.get('type') ?? 'GENERAL'),
     isPinned: String(formData.get('isPinned') ?? '') === 'on',
+    sendPush: String(formData.get('sendPush') ?? '') === 'on',
     publishAt: String(formData.get('publishAt') ?? '') || undefined,
     expiresAt: String(formData.get('expiresAt') ?? '') || undefined,
     targetRoles: targetRoles.length ? targetRoles : undefined,

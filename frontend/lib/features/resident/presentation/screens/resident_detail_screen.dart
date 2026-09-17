@@ -19,7 +19,7 @@ class _ResidentDetailScreenState extends ConsumerState<ResidentDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadResident();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadResident());
   }
 
   Future<void> _loadResident() async {
